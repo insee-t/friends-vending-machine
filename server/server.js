@@ -15,8 +15,21 @@ const io = socketIo(server, {
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: true, // Allow all origins for development
+  credentials: true
+}));
 app.use(express.json());
+
+// Add headers for Next.js compatibility
+app.use((req, res, next) => {
+  // Set proper headers for Next.js
+  res.setHeader('X-Forwarded-Proto', req.headers['x-forwarded-proto'] || 'http');
+  res.setHeader('X-Forwarded-For', req.headers['x-forwarded-for'] || req.connection.remoteAddress);
+  res.setHeader('X-Forwarded-Host', req.headers['x-forwarded-host'] || req.headers.host);
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '../out'))); // Serve Next.js build
 
 // In-memory storage (for production, use Redis or database)

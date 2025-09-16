@@ -31,8 +31,8 @@ export default function VPSServerPairingGame() {
 
   // Server URL - Update this to your VPS IP/domain
   const SERVER_URL = process.env.NODE_ENV === 'production' 
-    ? 'https://ionize13.com' 
-    : 'http://localhost:3000'
+    ? 'https://api.ionize13.com'
+    : 'https://api.ionize13.com'
 
   // Initialize socket connection
   useEffect(() => {

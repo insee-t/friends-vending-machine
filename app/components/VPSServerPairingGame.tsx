@@ -29,7 +29,7 @@ export default function VPSServerPairingGame() {
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
   const socketRef = useRef<Socket | null>(null)
 
-  // Server URL - Update this to your VPS IP/domain
+  // Server URL
   const SERVER_URL = process.env.NODE_ENV === 'production' 
     ? 'https://api.ionize13.com'
     : 'https://api.ionize13.com'
@@ -92,6 +92,13 @@ export default function VPSServerPairingGame() {
   const handleNicknameSubmit = (nickname: string) => {
     if (socketRef.current) {
       socketRef.current.emit('join-waiting', { nickname })
+      setCurrentUser({
+        id: socketRef.current.id,
+        nickname,
+        joinedAt: Date.now(),
+        status: 'waiting',
+        socketId: socketRef.current.id
+      })
       setGamePhase('waiting')
     }
   }
@@ -165,11 +172,13 @@ export default function VPSServerPairingGame() {
           <PairingResult pair={currentPair} />
         )}
 
-        {gamePhase === 'activity' && currentPair && (
+        {gamePhase === 'activity' && currentPair && socketRef.current && (
           <ActivityScreen 
             pair={currentPair}
             onNewGame={startNewGame}
             onLeave={leaveGame}
+            currentUser={currentUser}
+            socketRef={socketRef}
           />
         )}
       </div>
@@ -363,21 +372,60 @@ function PairingResult({ pair }: { pair: Pair }) {
   )
 }
 
-// Activity Screen Component
-function ActivityScreen({ 
-  pair, 
+function ActivityScreen({
+  pair,
   onNewGame,
-  onLeave
-}: { 
-  pair: Pair
-  onNewGame: () => void
-  onLeave: () => void
+  onLeave,
+  currentUser,
+  socketRef
+}: {
+  pair: Pair;
+  onNewGame: () => void;
+  onLeave: () => void;
+  currentUser: User | null;
+  socketRef: React.MutableRefObject<Socket | null>;
 }) {
-  const [showAnswer, setShowAnswer] = useState(false)
+  console.log('ActivityScreen props:', { pair, currentUser, socketRef });
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [userAnswer, setUserAnswer] = useState('');
+  const [partnerAnswer, setPartnerAnswer] = useState('');
+  const [isSubmitted, setIsSubmitted] = useState(false); // Track submission status
+
+  useEffect(() => {
+    if (!socketRef.current) return;
+
+    const socket = socketRef.current;
+
+    const handleReceiveAnswer = (data: { userId: string; answer: string }) => {
+      if (
+        (pair.user1.id === data.userId && pair.user2.id === currentUser?.id) ||
+        (pair.user2.id === data.userId && pair.user1.id === currentUser?.id)
+      ) {
+        setPartnerAnswer(data.answer);
+      }
+    };
+
+    socket.on('receive-answer', handleReceiveAnswer);
+
+    return () => {
+      socket.off('receive-answer', handleReceiveAnswer);
+    };
+  }, [pair, currentUser, socketRef]);
+
+  const handleAnswerSubmit = () => {
+    if (socketRef.current && userAnswer.trim() && currentUser && !isSubmitted) {
+      socketRef.current.emit('submit-answer', {
+        pairId: pair.id,
+        userId: currentUser.id,
+        answer: userAnswer.trim()
+      });
+      setIsSubmitted(true); // Mark as submitted
+    }
+  };
+  console.log(partnerAnswer)
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="text-center">
         <h2 className="text-3xl font-bold text-white mb-4">
           🎪 กิจกรรมสนุกๆ
@@ -387,7 +435,6 @@ function ActivityScreen({
         </p>
       </div>
 
-      {/* Question Card */}
       <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8">
         <div className="text-center mb-6">
           <div className="text-4xl mb-4">❓</div>
@@ -402,6 +449,25 @@ function ActivityScreen({
           </p>
         </div>
 
+        <div className="mb-6">
+          <textarea
+            value={userAnswer}
+            onChange={(e) => setUserAnswer(e.target.value)}
+            className="w-full px-4 py-3 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-white placeholder-white placeholder-opacity-60 focus:border-opacity-60 focus:outline-none text-center text-lg"
+            placeholder="พิมพ์คำตอบของคุณที่นี่..."
+            maxLength={200}
+            rows={4}
+            disabled={isSubmitted} // Disable only after submission
+          />
+          <button
+            onClick={handleAnswerSubmit}
+            className="mt-4 bg-gradient-to-r from-green-400 to-blue-400 text-white font-semibold py-3 px-6 rounded-lg hover:from-green-500 hover:to-blue-500 transition-all transform hover:scale-105"
+            disabled={!userAnswer.trim() || !socketRef.current?.connected || isSubmitted}
+          >
+            {isSubmitted ? 'ส่งคำตอบแล้ว ✅' : 'ส่งคำตอบ 📤'}
+          </button>
+        </div>
+
         <div className="text-center">
           <button
             onClick={() => setShowAnswer(!showAnswer)}
@@ -412,15 +478,37 @@ function ActivityScreen({
         </div>
 
         {showAnswer && (
-          <div className="mt-6 bg-yellow-400 bg-opacity-20 rounded-lg p-4">
-            <p className="text-yellow-200 text-center">
-              💡 ลองตอบคำถามนี้ด้วยกันและฟังคำตอบของกันและกัน!
-            </p>
+          <div className="mt-6 space-y-4">
+            {userAnswer && (
+              <div className="bg-blue-400 bg-opacity-20 rounded-lg p-4">
+                <p className="text-blue-200 text-lg">
+                  <strong>{currentUser?.nickname}:</strong> {userAnswer}
+                </p>
+              </div>
+            )}
+            {partnerAnswer && (
+              <div className="bg-yellow-400 bg-opacity-20 rounded-lg p-4">
+                <p className="text-yellow-200 text-lg">
+                  <strong>
+                    {pair.user1.id === currentUser?.id
+                      ? pair.user2.nickname
+                      : pair.user1.nickname}:
+                  </strong>{' '}
+                  {partnerAnswer}
+                </p>
+              </div>
+            )}
+            {!userAnswer && !partnerAnswer && (
+              <div className="bg-yellow-400 bg-opacity-20 rounded-lg p-4">
+                <p className="text-yellow-200 text-center">
+                  💡 ลองตอบคำถามนี้ด้วยกันและรอคำตอบของเพื่อน!
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Activity Card */}
       <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8">
         <div className="text-center mb-6">
           <div className="text-4xl mb-4">🎯</div>
@@ -444,7 +532,6 @@ function ActivityScreen({
         </div>
       </div>
 
-      {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         <button
           onClick={onNewGame}
@@ -452,7 +539,6 @@ function ActivityScreen({
         >
           🔄 หาเพื่อนใหม่
         </button>
-        
         <button
           onClick={onLeave}
           className="bg-gradient-to-r from-gray-400 to-gray-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-gray-500 hover:to-gray-700 transition-all transform hover:scale-105"
@@ -461,5 +547,5 @@ function ActivityScreen({
         </button>
       </div>
     </div>
-  )
+  );
 }

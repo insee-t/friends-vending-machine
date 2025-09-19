@@ -205,6 +205,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = localStorage.getItem('authToken')
       if (!token) return false
 
+      console.log('Sending friend request:', {
+        friendId,
+        currentUserId: authUser?.id,
+        API_BASE
+      })
+
       const response = await fetch(`${API_BASE}/api/friends/send-request`, {
         method: 'POST',
         headers: {
@@ -216,6 +222,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       })
 
       const data = await response.json()
+      console.log('Send friend request response:', data)
       return data.success
     } catch (error) {
       console.error('Send friend request error:', error)
@@ -232,6 +239,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = localStorage.getItem('authToken')
       if (!token) return false
 
+      console.log('Accepting friend request:', {
+        friendId,
+        currentUserId: authUser?.id,
+        API_BASE
+      })
+
       const response = await fetch(`${API_BASE}/api/friends/accept-request`, {
         method: 'POST',
         headers: {
@@ -243,6 +256,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       })
 
       const data = await response.json()
+      console.log('Accept friend request response:', data)
       return data.success
     } catch (error) {
       console.error('Accept friend request error:', error)

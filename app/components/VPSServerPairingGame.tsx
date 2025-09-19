@@ -1085,6 +1085,12 @@ function FriendRequestSection({
 
     try {
       // Use the actual user ID if available, otherwise fallback to socket ID
+      console.log('Sending friend request to partner:', {
+        partnerId,
+        partnerUserId: partner.userId,
+        partnerSocketId: partner.id,
+        currentUserId: authUser.id
+      })
       const success = await sendFriendRequest(partnerId)
       
       if (success) {

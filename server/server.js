@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const Database = require('./database');
 const multer = require('multer');
 const fs = require('fs');
 
@@ -17,6 +18,9 @@ const io = socketIo(server, {
     methods: ["GET", "POST"]
   }
 });
+
+// Initialize database
+const db = new Database();
 
 // Middleware
 app.use(cors({
@@ -39,24 +43,23 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../out')));
 }
 
-// In-memory storage (for production, use Redis or database)
+// In-memory storage for active sessions
 let users = new Map();
 let pairs = new Map();
-let registeredUsers = new Map(); // For authentication
 
 // JWT secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// Configure multer for file uploads
+// File upload configuration
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, 'uploads');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
-  filename: function (req, file, cb) {
+  filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
@@ -66,18 +69,6 @@ const upload = multer({
   storage: storage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
-  },
-  fileFilter: function (req, file, cb) {
-    // Allow images, videos, audio, and documents
-    const allowedTypes = /jpeg|jpg|png|gif|mp4|avi|mov|mp3|wav|pdf|doc|docx/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only images, videos, audio, and documents are allowed.'));
-    }
   }
 });
 
@@ -179,57 +170,13 @@ const iceBreakingQuestions = [
 
 const iceBreakingActivities = [
   // Music & Performance (Distance-Friendly)
-  // "🎤 ร้องเพลงให้กันฟัง (คนละ 1 เพลง)",
-  // "🎵 ฮัมเพลงให้อีกคนทาย",
-  // "🎶 ร้องเพลงคาราโอเกะพร้อมกัน (คนละเพลง)",
-  // "🎸 เล่นเครื่องดนตรีหรือทำเสียงดนตรีให้กันฟัง",
-  // "🎪 แสดงคอนเสิร์ตเล็กๆ ให้กันฟัง",
-  // "🎭 แสดงละครสั้นๆ เรื่องราวที่คุณแต่งขึ้น",
-  // "💃 แสดงท่าเต้นที่คุณชอบให้กันดู",
-  // "🕺 สอนท่าเต้นให้กันและกัน (ผ่านวิดีโอ)",
   "🎨 วาดรูปของกันและกัน (คนละรูป)",
-  // "🎪 เล่นเกม rock-paper-scissors (นับ 1-2-3 พร้อมกัน)",
-  
-  // Games & Challenges (Online-Friendly)
-  // "🎭 เล่นเกม charades (ทายคำ) ผ่านข้อความ",
-  // "🧩 เล่นเกมทายคำจากภาพ (ส่งรูปให้กันทาย)",
-  // "🎯 เล่นเกมทายคำจากเสียง (ทำเสียงให้กันทาย)",
-  // "🎲 เล่นเกมทายตัวเลข 1-10 (คนละตัวเลข)",
-  // "🎪 เล่นเกมทายคำจากท่าทาง (ผ่านวิดีโอ)",
-  // "🎮 เล่นเกมทายคำจากคำใบ้ (ส่งข้อความ)",
-  // "🎯 เล่นเกมทายคำจากรูปภาพ (ส่งรูปให้กันทาย)",
-  // "🎪 เล่นเกมทายคำจากเสียง (ทำเสียงให้กันทาย)",
-  // "🎲 เล่นเกมทายคำจากตัวเลข (คนละตัวเลข)",
-  // "🎯 เล่นเกมทายคำจากสี (บอกสีให้กันทาย)",
-  
-  // Creative & Art (Remote Collaboration)
-  // "🎨 วาดรูปของกันและกัน (คนละรูป)",
   "✏️ เขียนบทกวีสั้นๆ ให้กัน",
   "🎭 แต่งเรื่องสั้นๆ ด้วยกัน (คนละส่วน)",
   "🎨 วาดรูปด้วยกัน (คนละส่วนของรูป)",
-  // "✂️ ทำ origami ด้วยกัน (คนละตัว)",
-  // "🎨 วาดรูปด้วยนิ้ว (คนละรูป)",
-  // "✏️ เขียนจดหมายให้กัน",
   "🎭 แต่งเพลงสั้นๆ ด้วยกัน (คนละท่อน)",
-  // "🎨 วาดรูปด้วยสีเทียน (คนละรูป)",
-  // "✏️ เขียนเรื่องราวด้วยกัน (คนละส่วน)",
-  
-  // Virtual Physical & Movement
-  // "🤝 ทำท่าทาง handshake แบบพิเศษให้กันดู",
-  // "🤗 ทำท่าทางกอดกันแบบเพื่อนให้กันดู",
-  // "👋 ทำท่าทางทักทายแบบใหม่ให้กันดู",
-  // "💃 แสดงท่าเต้นที่คุณชอบให้กันดู",
-  // "🕺 สอนท่าเต้นให้กันและกัน (ผ่านวิดีโอ)",
-  // "🤸‍♀️ แสดงท่าทางที่คุณทำได้ให้กันดู",
-  // "🏃‍♀️ ทำท่าทางวิ่งแข่งกันสั้นๆ",
-  // "🤸‍♂️ แสดงท่าทางที่คุณทำได้ให้กันดู",
-  // "💪 แสดงท่าทางที่คุณทำได้ให้กันดู",
-  // "🤸‍♀️ แสดงท่าทางที่คุณทำได้ให้กันดู",
   
   // Communication & Sharing (Perfect for Online)
-  // "😄 เล่าเรื่องตลกให้กันฟัง",
-  // "📖 เล่าเรื่องราวที่คุณชอบให้กันฟัง",
-  // "🎭 เล่าเรื่องราวที่คุณแต่งขึ้นให้กันฟัง",
   "📚 แนะนำหนังสือที่คุณชอบให้กัน",
   "🎬 แนะนำหนังที่คุณชอบให้กัน",
   "🎵 แนะนำเพลงที่คุณชอบให้กัน",
@@ -238,70 +185,10 @@ const iceBreakingActivities = [
   "🎮 แนะนำเกมที่คุณชอบให้กัน",
   "📱 แนะนำแอปที่คุณชอบให้กัน",
   
-  // Fun & Silly (Online-Friendly)
-  // "🌟 แสดงความสามารถพิเศษของคุณให้กันดู",
-  // "😄 ทำหน้าตลกให้กันดู (ผ่านวิดีโอ)",
-  // "🎭 เล่นเกมทายคำจากท่าทาง (ผ่านวิดีโอ)",
-  // "🎪 เล่นเกมทายคำจากเสียง (ทำเสียงให้กันทาย)",
-  // "🎲 เล่นเกมทายคำจากตัวเลข (คนละตัวเลข)",
-  // "🎯 เล่นเกมทายคำจากสี (บอกสีให้กันทาย)",
-  // "🎪 เล่นเกมทายคำจากรูปภาพ (ส่งรูปให้กันทาย)",
-  // "🎭 เล่นเกมทายคำจากท่าทาง (ผ่านวิดีโอ)",
-  // "🎵 เล่นเกมทายคำจากเสียง (ทำเสียงให้กันทาย)",
-  // "🎲 เล่นเกมทายคำจากตัวเลข (คนละตัวเลข)",
-  
-  // Memory & Learning (Perfect for Online)
-  // "🧠 ทดสอบความจำด้วยกัน (ถามตอบ)",
-  // "📚 สอนสิ่งใหม่ให้กันและกัน",
-  // "🎯 ทดสอบความรู้ด้วยกัน (ถามตอบ)",
-  // "🧩 แก้ปริศนาด้วยกัน (ร่วมกันคิด)",
-  // "🎪 เล่นเกมทายคำจากท่าทาง (ผ่านวิดีโอ)",
-  // "🎭 เล่นเกมทายคำจากเสียง (ทำเสียงให้กันทาย)",
-  // "🎲 เล่นเกมทายคำจากตัวเลข (คนละตัวเลข)",
-  // "🎯 เล่นเกมทายคำจากสี (บอกสีให้กันทาย)",
-  // "🎪 เล่นเกมทายคำจากรูปภาพ (ส่งรูปให้กันทาย)",
-  // "🎭 เล่นเกมทายคำจากท่าทาง (ผ่านวิดีโอ)",
-  
-  // Virtual Photo & Memory
-  // "📸 ถ่ายรูป selfie ให้กันดู (คนละรูป)",
-  // "📷 ถ่ายรูปในท่าทางต่างๆ ให้กันดู",
-  // "📱 ถ่ายวิดีโอสั้นๆ ให้กันดู (คนละวิดีโอ)",
-  // "📸 ถ่ายรูปในท่าทางตลกให้กันดู",
-  // "📷 ถ่ายรูปในท่าทางสวยงามให้กันดู",
-  // "📱 ถ่ายวิดีโอสั้นๆ ให้กันดู (คนละวิดีโอ)",
-  // "📸 ถ่ายรูปในท่าทางต่างๆ ให้กันดู",
-  // "📷 ถ่ายรูปในท่าทางตลกให้กันดู",
-  // "📱 ถ่ายวิดีโอสั้นๆ ให้กันดู (คนละวิดีโอ)",
-  // "📸 ถ่ายรูปในท่าทางสวยงามให้กันดู",
-  
-  // Virtual Special & Unique
-  // "🎁 แนะนำของขวัญเล็กๆ ให้กัน (คนละอย่าง)",
-  // "💌 เขียนจดหมายให้กัน (ส่งข้อความ)",
-  // "🎂 ฉลองวันเกิดด้วยกัน (แม้ไม่ใช่วันเกิด) - ร้องเพลงให้กัน",
-  // "🎉 ฉลองอะไรก็ได้ด้วยกัน (คนละอย่าง)",
-  // "🎊 ฉลองความสำเร็จด้วยกัน (คนละความสำเร็จ)",
-  // "🎈 ฉลองวันพิเศษด้วยกัน (คนละวันพิเศษ)",
-  // "🎁 แนะนำของขวัญเล็กๆ ให้กัน (คนละอย่าง)",
-  // "💌 เขียนจดหมายให้กัน (ส่งข้อความ)",
-  // "🎂 ฉลองวันเกิดด้วยกัน (แม้ไม่ใช่วันเกิด) - ร้องเพลงให้กัน",
-  // "🎉 ฉลองอะไรก็ได้ด้วยกัน (คนละอย่าง)",
-  
   // Additional Online-Specific Activities
-  // "🌍 แชร์ตำแหน่งที่อยู่ปัจจุบันให้กันดู",
-  // "☁️ แชร์สภาพอากาศที่บ้านให้กันฟัง",
-  // "🍽️ แชร์อาหารที่กำลังกินให้กันดู",
-  // "📚 แชร์หนังสือที่กำลังอ่านให้กันดู",
   "🎵 แชร์เพลงที่กำลังฟังให้กันฟัง",
-  // "🎬 แชร์หนังที่กำลังดูให้กันดู",
   "🎮 แชร์เกมที่กำลังเล่นให้กันดู",
-  // "📱 แชร์แอปที่กำลังใช้ให้กันดู",
-  // "🏠 แชร์ห้องที่อยู่ให้กันดู",
-  "🐕 แชร์สัตว์เลี้ยงให้กันดู (ถ้ามี)",
-  // "🌱 แชร์ต้นไม้ที่ปลูกให้กันดู (ถ้ามี)",
-  // "🎨 แชร์งานศิลปะที่ทำให้กันดู",
-  // "✍️ แชร์งานเขียนที่เขียนให้กันดู",
-  // "🎭 แชร์การแสดงที่ทำให้กันดู",
-  // "🎪 แชร์ความสนุกที่ทำให้กันดู"
+  "🐕 แชร์สัตว์เลี้ยงให้กันดู (ถ้ามี)"
 ];
 
 // Clean up old users every 5 minutes
@@ -426,7 +313,7 @@ io.on('connection', (socket) => {
         .find(s => s.id === partnerId);
       
       if (partnerSocket) {
-        // Send the activity answer to the partner
+        // Send the answer to the partner
         partnerSocket.emit('receive-activity-answer', {
           userId: userId,
           answer: answer,
@@ -504,20 +391,46 @@ const authenticateToken = (req, res, next) => {
 };
 
 // API Routes
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    users: users.size,
-    pairs: pairs.size,
-    registeredUsers: registeredUsers.size,
-    timestamp: new Date().toISOString()
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    const stats = await db.getStats();
+    res.json({ 
+      status: 'ok', 
+      users: users.size,
+      pairs: pairs.size,
+      registeredUsers: stats.total_users,
+      activeUsers7d: stats.active_users_7d,
+      activeUsers30d: stats.active_users_30d,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.json({ 
+      status: 'ok', 
+      users: users.size,
+      pairs: pairs.size,
+      registeredUsers: 0,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 app.get('/api/users', (req, res) => {
   const userList = Array.from(users.values());
   res.json({ users: userList });
 });
+
+// File upload endpoint
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No file uploaded' });
+  }
+
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({ success: true, fileUrl });
+});
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Authentication routes
 app.post('/api/auth/signup', async (req, res) => {
@@ -539,28 +452,14 @@ app.post('/api/auth/signup', async (req, res) => {
       });
     }
 
-    // Check if user already exists
-    if (registeredUsers.has(email)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User already exists' 
-      });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
+    // Create user in database
     const userId = uuidv4();
-    const user = {
+    const user = await db.createUser({
       id: userId,
       email,
       nickname: nickname.trim(),
-      password: hashedPassword,
-      createdAt: new Date().toISOString()
-    };
-
-    registeredUsers.set(email, user);
+      password
+    });
 
     // Generate JWT token
     const token = jwt.sign(
@@ -569,21 +468,25 @@ app.post('/api/auth/signup', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Return user data (without password)
-    const { password: _, ...userWithoutPassword } = user;
-    
     res.json({
       success: true,
       token,
-      user: userWithoutPassword
+      user: user
     });
 
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Internal server error' 
-    });
+    if (error.message === 'User already exists') {
+      res.status(400).json({ 
+        success: false, 
+        message: 'User already exists' 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
   }
 });
 
@@ -599,18 +502,9 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Find user
-    const user = registeredUsers.get(email);
+    // Verify user credentials
+    const user = await db.verifyPassword(email, password);
     if (!user) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid credentials' 
-      });
-    }
-
-    // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid credentials' 
@@ -624,13 +518,10 @@ app.post('/api/auth/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Return user data (without password)
-    const { password: _, ...userWithoutPassword } = user;
-    
     res.json({
       success: true,
       token,
-      user: userWithoutPassword
+      user: user
     });
 
   } catch (error) {
@@ -642,10 +533,10 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.get('/api/auth/verify', authenticateToken, (req, res) => {
+app.get('/api/auth/verify', authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
-    const user = registeredUsers.get(email);
+    const user = await db.getUserByEmail(email);
     
     if (!user) {
       return res.status(404).json({ 
@@ -655,11 +546,16 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
     }
 
     // Return user data (without password)
-    const { password: _, ...userWithoutPassword } = user;
+    const userData = {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      createdAt: user.created_at
+    };
     
     res.json({
       success: true,
-      user: userWithoutPassword
+      user: userData
     });
 
   } catch (error) {
@@ -671,30 +567,44 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
   }
 });
 
-// File upload route
-app.post('/api/upload', upload.single('file'), (req, res) => {
+// User profile routes
+app.get('/api/user/profile', authenticateToken, async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+    const { email } = req.user;
+    const user = await db.getUserByEmail(email);
     
-    const fileUrl = `/uploads/${req.file.filename}`;
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+
+    // Get user's game history
+    const gameHistory = await db.getUserGameHistory(user.id, 10);
+
+    const userData = {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      createdAt: user.created_at,
+      lastLogin: user.last_login,
+      gameHistory: gameHistory
+    };
     
     res.json({
       success: true,
-      fileUrl: fileUrl,
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      size: req.file.size
+      user: userData
     });
+
   } catch (error) {
-    console.error('File upload error:', error);
-    res.status(500).json({ error: 'File upload failed' });
+    console.error('Profile error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
   }
 });
-
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Serve the Next.js app (only in production)
 if (process.env.NODE_ENV === 'production') {
@@ -706,8 +616,31 @@ if (process.env.NODE_ENV === 'production') {
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
-  console.log(`📊 Health check: http://${HOST}:${PORT}/api/health`);
-  console.log(`👥 Users API: http://${HOST}:${PORT}/api/users`);
+// Initialize database and start server
+async function startServer() {
+  try {
+    await db.init();
+    
+    server.listen(PORT, HOST, () => {
+      console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+      console.log(`📊 Health check: http://${HOST}:${PORT}/api/health`);
+      console.log(`👥 Users API: http://${HOST}:${PORT}/api/users`);
+      console.log(`💾 Database: SQLite (users.db)`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down server...');
+  db.close();
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
 });
+
+startServer();

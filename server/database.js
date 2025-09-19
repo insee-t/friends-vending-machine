@@ -52,6 +52,20 @@ class Database {
         )
       `;
 
+      const createFriendsTable = `
+        CREATE TABLE IF NOT EXISTS friends (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          friend_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          FOREIGN KEY (friend_id) REFERENCES users (id),
+          UNIQUE(user_id, friend_id)
+        )
+      `;
+
       this.db.serialize(() => {
         this.db.run(createUsersTable, (err) => {
           if (err) {
@@ -76,6 +90,15 @@ class Database {
             reject(err);
           } else {
             console.log('✅ Game history table created/verified');
+          }
+        });
+
+        this.db.run(createFriendsTable, (err) => {
+          if (err) {
+            console.error('Error creating friends table:', err);
+            reject(err);
+          } else {
+            console.log('✅ Friends table created/verified');
             resolve();
           }
         });
@@ -199,6 +222,215 @@ class Database {
           reject(err);
         } else {
           resolve(row);
+        }
+      });
+    });
+  }
+
+  async getUserGameHistory(userId, limit = 10) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT * FROM game_history 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT ?
+      `;
+      
+      this.db.all(sql, [userId, limit], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  async sendFriendRequest(userId, friendId) {
+    return new Promise((resolve, reject) => {
+      const { v4: uuidv4 } = require('uuid');
+      const requestId = uuidv4();
+      
+      const sql = `
+        INSERT INTO friends (id, user_id, friend_id, status)
+        VALUES (?, ?, ?, 'pending')
+      `;
+      
+      this.db.run(sql, [requestId, userId, friendId], function(err) {
+        if (err) {
+          if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            reject(new Error('Friend request already exists'));
+          } else {
+            reject(err);
+          }
+        } else {
+          resolve({ id: requestId, status: 'pending' });
+        }
+      });
+    });
+  }
+
+  async acceptFriendRequest(userId, friendId) {
+    return new Promise((resolve, reject) => {
+      const { v4: uuidv4 } = require('uuid');
+      const requestId = uuidv4();
+      
+      // First, update the existing request to accepted
+      const updateSql = `
+        UPDATE friends 
+        SET status = 'accepted', updated_at = CURRENT_TIMESTAMP 
+        WHERE user_id = ? AND friend_id = ? AND status = 'pending'
+      `;
+      
+      this.db.run(updateSql, [friendId, userId], function(err) {
+        if (err) {
+          reject(err);
+        } else if (this.changes === 0) {
+          reject(new Error('No pending friend request found'));
+        } else {
+          // Create the reciprocal friendship
+          const insertSql = `
+            INSERT INTO friends (id, user_id, friend_id, status)
+            VALUES (?, ?, ?, 'accepted')
+          `;
+          
+          this.db.run(insertSql, [requestId, userId, friendId], function(insertErr) {
+            if (insertErr) {
+              reject(insertErr);
+            } else {
+              resolve({ id: requestId, status: 'accepted' });
+            }
+          });
+        }
+      });
+    });
+  }
+
+  async rejectFriendRequest(userId, friendId) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        DELETE FROM friends 
+        WHERE user_id = ? AND friend_id = ? AND status = 'pending'
+      `;
+      
+      this.db.run(sql, [friendId, userId], function(err) {
+        if (err) {
+          reject(err);
+        } else if (this.changes === 0) {
+          reject(new Error('No pending friend request found'));
+        } else {
+          resolve({ success: true });
+        }
+      });
+    });
+  }
+
+  async removeFriend(userId, friendId) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        DELETE FROM friends 
+        WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+      `;
+      
+      this.db.run(sql, [userId, friendId, friendId, userId], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ success: true, changes: this.changes });
+        }
+      });
+    });
+  }
+
+  async getFriends(userId) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT u.id, u.nickname, u.social_media_handle, f.created_at, f.status
+        FROM friends f
+        JOIN users u ON f.friend_id = u.id
+        WHERE f.user_id = ? AND f.status = 'accepted'
+        ORDER BY f.created_at DESC
+      `;
+      
+      this.db.all(sql, [userId], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  async getFriendRequests(userId) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT u.id, u.nickname, u.social_media_handle, f.created_at
+        FROM friends f
+        JOIN users u ON f.user_id = u.id
+        WHERE f.friend_id = ? AND f.status = 'pending'
+        ORDER BY f.created_at DESC
+      `;
+      
+      this.db.all(sql, [userId], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  async getSentFriendRequests(userId) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT u.id, u.nickname, u.social_media_handle, f.created_at, f.status
+        FROM friends f
+        JOIN users u ON f.friend_id = u.id
+        WHERE f.user_id = ? AND f.status = 'pending'
+        ORDER BY f.created_at DESC
+      `;
+      
+      this.db.all(sql, [userId], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  async areFriends(userId, friendId) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT status FROM friends 
+        WHERE user_id = ? AND friend_id = ? AND status = 'accepted'
+      `;
+      
+      this.db.get(sql, [userId, friendId], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(!!row);
+        }
+      });
+    });
+  }
+
+  async hasPendingRequest(userId, friendId) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT status FROM friends 
+        WHERE user_id = ? AND friend_id = ? AND status = 'pending'
+      `;
+      
+      this.db.get(sql, [userId, friendId], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(!!row);
         }
       });
     });

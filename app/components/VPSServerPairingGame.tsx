@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 interface User {
   id: string
+  userId?: string | null
   nickname: string
   socialMediaHandle?: string
   joinedAt: number
@@ -106,7 +107,8 @@ export default function VPSServerPairingGame() {
   const handleNicknameSubmit = (nickname: string) => {
     if (socketRef.current && socketRef.current.id) {
       const socialMediaHandle = authUser?.socialMediaHandle || null
-      socketRef.current.emit('join-waiting', { nickname, socialMediaHandle })
+      const userId = authUser?.id || null
+      socketRef.current.emit('join-waiting', { nickname, socialMediaHandle, userId })
       setCurrentUser({
         id: socketRef.current.id,
         nickname,
@@ -208,6 +210,8 @@ export default function VPSServerPairingGame() {
             onLeave={leaveGame}
             currentUser={currentUser}
             socketRef={socketRef}
+            isAuthenticated={isAuthenticated}
+            authUser={authUser}
           />
         )}
       </div>
@@ -493,13 +497,17 @@ function ActivityScreen({
   onNewGame,
   onLeave,
   currentUser,
-  socketRef
+  socketRef,
+  isAuthenticated,
+  authUser
 }: {
   pair: Pair;
   onNewGame: () => void;
   onLeave: () => void;
   currentUser: User | null;
   socketRef: React.MutableRefObject<Socket | null>;
+  isAuthenticated: boolean;
+  authUser: any;
 }) {
   console.log('ActivityScreen props:', { pair, currentUser, socketRef });
   const [showAnswer, setShowAnswer] = useState(false);
@@ -993,6 +1001,15 @@ function ActivityScreen({
         
       </div>
 
+      {/* Friend Request Section - Only show if both users are authenticated */}
+      {isAuthenticated && authUser && (
+        <FriendRequestSection 
+          currentUser={currentUser}
+          pair={pair}
+          authUser={authUser}
+        />
+      )}
+
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         <button
@@ -1010,5 +1027,118 @@ function ActivityScreen({
       </div>
     </div>
   );
+}
+
+// Friend Request Section Component
+function FriendRequestSection({ 
+  currentUser, 
+  pair, 
+  authUser 
+}: { 
+  currentUser: User | null
+  pair: Pair
+  authUser: any
+}) {
+  const { sendFriendRequest } = useAuth()
+  const [friendRequestStatus, setFriendRequestStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [errorMessage, setErrorMessage] = useState('')
+
+  // Get the partner's user ID and nickname
+  const partner = pair.user1.id === currentUser?.id ? pair.user2 : pair.user1
+  const partnerId = partner.userId || partner.id // Use actual user ID if available, fallback to socket ID
+  const partnerNickname = partner.nickname
+
+  const handleSendFriendRequest = async () => {
+    if (!currentUser || !authUser) return
+
+    setFriendRequestStatus('sending')
+    setErrorMessage('')
+
+    try {
+      // Use the actual user ID if available, otherwise fallback to socket ID
+      const success = await sendFriendRequest(partnerId)
+      
+      if (success) {
+        setFriendRequestStatus('sent')
+      } else {
+        setFriendRequestStatus('error')
+        setErrorMessage('ไม่สามารถส่งคำขอเป็นเพื่อนได้')
+      }
+    } catch (error) {
+      setFriendRequestStatus('error')
+      setErrorMessage('เกิดข้อผิดพลาดในการส่งคำขอเป็นเพื่อน')
+    }
+  }
+
+  return (
+    <div className="bg-white backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white border-opacity-20">
+      <div className="text-center mb-6">
+        <div className="inline-block bg-gradient-to-r from-pink-500 to-purple-500 rounded-full p-4 mb-4">
+          <div className="text-4xl">👥</div>
+        </div>
+        <h3 className="text-2xl font-bold text-black mb-2">
+          เพิ่มเพื่อน
+        </h3>
+        <div className="w-24 h-1 bg-gradient-to-r from-pink-400 to-purple-400 mx-auto rounded-full"></div>
+      </div>
+
+      <div className="text-center">
+        <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl p-6 mb-6 border border-pink-200">
+          <p className="text-black text-lg mb-4">
+            คุณสนุกกับการเล่นกับ <strong>{partnerNickname}</strong> หรือไม่?
+          </p>
+          <p className="text-gray-600 text-sm">
+            เพิ่มเป็นเพื่อนเพื่อติดต่อกันได้ในอนาคต!
+          </p>
+        </div>
+
+        {friendRequestStatus === 'idle' && (
+          <button
+            onClick={handleSendFriendRequest}
+            className="bg-gradient-to-r from-pink-400 to-purple-400 text-white font-semibold py-3 px-8 rounded-xl hover:from-pink-500 hover:to-purple-500 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+          >
+            👥 ส่งคำขอเป็นเพื่อน
+          </button>
+        )}
+
+        {friendRequestStatus === 'sending' && (
+          <div className="flex items-center justify-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-600"></div>
+            <span className="text-black">กำลังส่งคำขอ...</span>
+          </div>
+        )}
+
+        {friendRequestStatus === 'sent' && (
+          <div className="bg-green-100 border border-green-300 rounded-xl p-4">
+            <div className="flex items-center justify-center space-x-2">
+              <div className="text-green-600 text-2xl">✅</div>
+              <span className="text-green-800 font-semibold">ส่งคำขอเป็นเพื่อนแล้ว!</span>
+            </div>
+            <p className="text-green-700 text-sm mt-2">
+              รอให้ {partnerNickname} ยอมรับคำขอของคุณ
+            </p>
+          </div>
+        )}
+
+        {friendRequestStatus === 'error' && (
+          <div className="bg-red-100 border border-red-300 rounded-xl p-4">
+            <div className="flex items-center justify-center space-x-2">
+              <div className="text-red-600 text-2xl">❌</div>
+              <span className="text-red-800 font-semibold">เกิดข้อผิดพลาด</span>
+            </div>
+            <p className="text-red-700 text-sm mt-2">
+              {errorMessage}
+            </p>
+            <button
+              onClick={() => setFriendRequestStatus('idle')}
+              className="mt-3 text-red-600 hover:text-red-700 underline text-sm"
+            >
+              ลองใหม่
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 

@@ -1,14 +1,18 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 export const UserProfile: React.FC = () => {
-  const { user, logout, updateSocialMediaHandle } = useAuth()
+  const { user, logout, updateSocialMediaHandle, getFriends, getFriendRequests, acceptFriendRequest, rejectFriendRequest } = useAuth()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isEditingSocialHandle, setIsEditingSocialHandle] = useState(false)
   const [socialHandleInput, setSocialHandleInput] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
+  const [friends, setFriends] = useState<any[]>([])
+  const [friendRequests, setFriendRequests] = useState<any[]>([])
+  const [showFriends, setShowFriends] = useState(false)
+  const [isLoadingFriends, setIsLoadingFriends] = useState(false)
 
   const handleSocialHandleSubmit = async () => {
     if (isUpdating) return
@@ -31,6 +35,42 @@ export const UserProfile: React.FC = () => {
     setIsEditingSocialHandle(false)
     setSocialHandleInput('')
   }
+
+  const loadFriends = async () => {
+    setIsLoadingFriends(true)
+    try {
+      const [friendsData, requestsData] = await Promise.all([
+        getFriends(),
+        getFriendRequests()
+      ])
+      setFriends(friendsData)
+      setFriendRequests(requestsData)
+    } catch (error) {
+      console.error('Error loading friends:', error)
+    } finally {
+      setIsLoadingFriends(false)
+    }
+  }
+
+  const handleAcceptFriendRequest = async (friendId: string) => {
+    const success = await acceptFriendRequest(friendId)
+    if (success) {
+      loadFriends() // Reload friends list
+    }
+  }
+
+  const handleRejectFriendRequest = async (friendId: string) => {
+    const success = await rejectFriendRequest(friendId)
+    if (success) {
+      loadFriends() // Reload friends list
+    }
+  }
+
+  useEffect(() => {
+    if (isDropdownOpen && user) {
+      loadFriends()
+    }
+  }, [isDropdownOpen, user])
 
   if (!user) return null
 
@@ -126,6 +166,87 @@ export const UserProfile: React.FC = () => {
                     >
                       แก้ไข
                     </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Friends Section */}
+              <div className="px-3 py-2 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm text-gray-600">เพื่อน</div>
+                  <button
+                    onClick={() => setShowFriends(!showFriends)}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    {showFriends ? 'ซ่อน' : 'ดู'}
+                  </button>
+                </div>
+                
+                {showFriends && (
+                  <div className="space-y-3">
+                    {/* Friend Requests */}
+                    {friendRequests.length > 0 && (
+                      <div>
+                        <div className="text-xs text-gray-500 mb-2">คำขอเป็นเพื่อน ({friendRequests.length})</div>
+                        <div className="space-y-2">
+                          {friendRequests.map((request) => (
+                            <div key={request.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                                  {request.nickname.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="text-xs font-medium text-gray-900">{request.nickname}</div>
+                                  {request.social_media_handle && (
+                                    <div className="text-xs text-gray-500">📱 {request.social_media_handle}</div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex space-x-1">
+                                <button
+                                  onClick={() => handleAcceptFriendRequest(request.id)}
+                                  className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={() => handleRejectFriendRequest(request.id)}
+                                  className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                                >
+                                  ✗
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Friends List */}
+                    <div>
+                      <div className="text-xs text-gray-500 mb-2">เพื่อน ({friends.length})</div>
+                      {isLoadingFriends ? (
+                        <div className="text-xs text-gray-500">กำลังโหลด...</div>
+                      ) : friends.length > 0 ? (
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                          {friends.map((friend) => (
+                            <div key={friend.id} className="flex items-center space-x-2 bg-blue-50 rounded-lg p-2">
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                                {friend.nickname.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex-1">
+                                <div className="text-xs font-medium text-gray-900">{friend.nickname}</div>
+                                {friend.social_media_handle && (
+                                  <div className="text-xs text-gray-500">📱 {friend.social_media_handle}</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-500">ยังไม่มีเพื่อน</div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

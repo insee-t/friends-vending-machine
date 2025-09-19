@@ -240,9 +240,10 @@ io.on('connection', (socket) => {
 
   // User joins the waiting room
   socket.on('join-waiting', (data) => {
-    const { nickname, socialMediaHandle } = data;
+    const { nickname, socialMediaHandle, userId } = data;
     const user = {
       id: socket.id,
+      userId: userId || null, // Store the actual user ID if available
       nickname: nickname.trim(),
       socialMediaHandle: socialMediaHandle || null,
       joinedAt: Date.now(),
@@ -687,6 +688,217 @@ app.put('/api/user/social-media-handle', authenticateToken, async (req, res) => 
 
   } catch (error) {
     console.error('Update social media handle error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+});
+
+// Friend system routes
+app.post('/api/friends/send-request', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { friendId } = req.body;
+
+    if (!friendId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Friend ID is required' 
+      });
+    }
+
+    if (userId === friendId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot send friend request to yourself' 
+      });
+    }
+
+    // Check if already friends
+    const areFriends = await db.areFriends(userId, friendId);
+    if (areFriends) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Already friends with this user' 
+      });
+    }
+
+    // Check if there's already a pending request
+    const hasPendingRequest = await db.hasPendingRequest(userId, friendId);
+    if (hasPendingRequest) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Friend request already sent' 
+      });
+    }
+
+    const result = await db.sendFriendRequest(userId, friendId);
+    res.json({
+      success: true,
+      message: 'Friend request sent successfully',
+      request: result
+    });
+
+  } catch (error) {
+    console.error('Send friend request error:', error);
+    if (error.message === 'Friend request already exists') {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Friend request already exists' 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  }
+});
+
+app.post('/api/friends/accept-request', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { friendId } = req.body;
+
+    if (!friendId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Friend ID is required' 
+      });
+    }
+
+    const result = await db.acceptFriendRequest(userId, friendId);
+    res.json({
+      success: true,
+      message: 'Friend request accepted successfully',
+      friendship: result
+    });
+
+  } catch (error) {
+    console.error('Accept friend request error:', error);
+    if (error.message === 'No pending friend request found') {
+      res.status(400).json({ 
+        success: false, 
+        message: 'No pending friend request found' 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  }
+});
+
+app.post('/api/friends/reject-request', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { friendId } = req.body;
+
+    if (!friendId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Friend ID is required' 
+      });
+    }
+
+    const result = await db.rejectFriendRequest(userId, friendId);
+    res.json({
+      success: true,
+      message: 'Friend request rejected successfully'
+    });
+
+  } catch (error) {
+    console.error('Reject friend request error:', error);
+    if (error.message === 'No pending friend request found') {
+      res.status(400).json({ 
+        success: false, 
+        message: 'No pending friend request found' 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  }
+});
+
+app.delete('/api/friends/remove', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { friendId } = req.body;
+
+    if (!friendId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Friend ID is required' 
+      });
+    }
+
+    const result = await db.removeFriend(userId, friendId);
+    res.json({
+      success: true,
+      message: 'Friend removed successfully'
+    });
+
+  } catch (error) {
+    console.error('Remove friend error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+});
+
+app.get('/api/friends', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const friends = await db.getFriends(userId);
+    res.json({
+      success: true,
+      friends: friends
+    });
+
+  } catch (error) {
+    console.error('Get friends error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+});
+
+app.get('/api/friends/requests', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const requests = await db.getFriendRequests(userId);
+    res.json({
+      success: true,
+      requests: requests
+    });
+
+  } catch (error) {
+    console.error('Get friend requests error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+});
+
+app.get('/api/friends/sent-requests', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const sentRequests = await db.getSentFriendRequests(userId);
+    res.json({
+      success: true,
+      sentRequests: sentRequests
+    });
+
+  } catch (error) {
+    console.error('Get sent friend requests error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 

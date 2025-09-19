@@ -6,6 +6,8 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -44,6 +46,40 @@ let registeredUsers = new Map(); // For authentication
 
 // JWT secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    // Allow images, videos, audio, and documents
+    const allowedTypes = /jpeg|jpg|png|gif|mp4|avi|mov|mp3|wav|pdf|doc|docx/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images, videos, audio, and documents are allowed.'));
+    }
+  }
+});
 
 // Ice-breaking questions and activities
 const iceBreakingQuestions = [
@@ -349,7 +385,7 @@ io.on('connection', (socket) => {
 
   // Handle answer submission
   socket.on('submit-answer', (data) => {
-    const { pairId, userId, answer } = data;
+    const { pairId, userId, answer, fileUrl } = data;
     const pair = pairs.get(pairId);
     
     if (pair) {
@@ -364,9 +400,39 @@ io.on('connection', (socket) => {
         // Send the answer to the partner
         partnerSocket.emit('receive-answer', {
           userId: userId,
-          answer: answer
+          answer: answer,
+          fileUrl: fileUrl
         });
         console.log(`Answer sent to partner ${partnerId}`);
+      } else {
+        console.log(`Partner ${partnerId} not found`);
+      }
+    } else {
+      console.log(`Pair ${pairId} not found`);
+    }
+  });
+
+  // Handle activity answer submission
+  socket.on('submit-activity-answer', (data) => {
+    const { pairId, userId, answer, fileUrl } = data;
+    const pair = pairs.get(pairId);
+    
+    if (pair) {
+      console.log(`Activity answer submitted by ${userId} for pair ${pairId}: ${answer}`);
+      
+      // Find the partner's socket ID
+      const partnerId = pair.user1.id === userId ? pair.user2.id : pair.user1.id;
+      const partnerSocket = Array.from(io.sockets.sockets.values())
+        .find(s => s.id === partnerId);
+      
+      if (partnerSocket) {
+        // Send the activity answer to the partner
+        partnerSocket.emit('receive-activity-answer', {
+          userId: userId,
+          answer: answer,
+          fileUrl: fileUrl
+        });
+        console.log(`Activity answer sent to partner ${partnerId}`);
       } else {
         console.log(`Partner ${partnerId} not found`);
       }
@@ -604,6 +670,31 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
     });
   }
 });
+
+// File upload route
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const fileUrl = `/uploads/${req.file.filename}`;
+    
+    res.json({
+      success: true,
+      fileUrl: fileUrl,
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size
+    });
+  } catch (error) {
+    console.error('File upload error:', error);
+    res.status(500).json({ error: 'File upload failed' });
+  }
+});
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Serve the Next.js app (only in production)
 if (process.env.NODE_ENV === 'production') {

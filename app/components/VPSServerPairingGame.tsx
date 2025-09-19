@@ -491,13 +491,23 @@ function ActivityScreen({
   const [userAnswer, setUserAnswer] = useState('');
   const [partnerAnswer, setPartnerAnswer] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false); // Track submission status
+  
+  // Activity form states
+  const [showActivityAnswer, setShowActivityAnswer] = useState(false);
+  const [userActivityAnswer, setUserActivityAnswer] = useState('');
+  const [partnerActivityAnswer, setPartnerActivityAnswer] = useState('');
+  const [isActivitySubmitted, setIsActivitySubmitted] = useState(false);
+  const [userFile, setUserFile] = useState<File | null>(null);
+  const [partnerFile, setPartnerFile] = useState<string | null>(null);
+  const [userFileUrl, setUserFileUrl] = useState<string | null>(null);
+  const [partnerFileUrl, setPartnerFileUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!socketRef.current) return;
 
     const socket = socketRef.current;
 
-    const handleReceiveAnswer = (data: { userId: string; answer: string }) => {
+    const handleReceiveAnswer = (data: { userId: string; answer: string; fileUrl?: string }) => {
       console.log('Received answer data:', data);
       console.log('Current pair:', pair);
       console.log('Current user:', currentUser);
@@ -509,30 +519,125 @@ function ActivityScreen({
       ) {
         console.log('Answer is from partner, setting partner answer:', data.answer);
         setPartnerAnswer(data.answer);
+        if (data.fileUrl) {
+          setPartnerFileUrl(data.fileUrl);
+        }
       } else {
         console.log('Answer is not from partner, ignoring');
       }
     };
 
+    const handleReceiveActivityAnswer = (data: { userId: string; answer: string; fileUrl?: string }) => {
+      console.log('Received activity answer data:', data);
+      
+      if (
+        (pair.user1.id === data.userId && pair.user2.id === currentUser?.id) ||
+        (pair.user2.id === data.userId && pair.user1.id === currentUser?.id)
+      ) {
+        console.log('Activity answer is from partner, setting partner activity answer:', data.answer);
+        setPartnerActivityAnswer(data.answer);
+        if (data.fileUrl) {
+          setPartnerFileUrl(data.fileUrl);
+        }
+      }
+    };
+
     socket.on('receive-answer', handleReceiveAnswer);
+    socket.on('receive-activity-answer', handleReceiveActivityAnswer);
 
     return () => {
       socket.off('receive-answer', handleReceiveAnswer);
+      socket.off('receive-activity-answer', handleReceiveActivityAnswer);
     };
   }, [pair, currentUser, socketRef]);
 
-  const handleAnswerSubmit = () => {
+  const handleAnswerSubmit = async () => {
     if (socketRef.current && userAnswer.trim() && currentUser && !isSubmitted) {
+      let fileUrl = null;
+      
+      // Upload file if selected
+      if (userFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', userFile);
+          formData.append('pairId', pair.id);
+          formData.append('userId', currentUser.id);
+          
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            fileUrl = result.fileUrl;
+          }
+        } catch (error) {
+          console.error('File upload failed:', error);
+        }
+      }
+
       const submitData = {
         pairId: pair.id,
         userId: currentUser.id,
-        answer: userAnswer.trim()
+        answer: userAnswer.trim(),
+        fileUrl: fileUrl
       };
       console.log('Submitting answer:', submitData);
       socketRef.current.emit('submit-answer', submitData);
       setIsSubmitted(true); // Mark as submitted
     }
   };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUserFile(file);
+      // Create preview URL
+      const url = URL.createObjectURL(file);
+      setUserFileUrl(url);
+    }
+  };
+
+  const handleActivitySubmit = async () => {
+    if (socketRef.current && userActivityAnswer.trim() && currentUser && !isActivitySubmitted) {
+      let fileUrl = null;
+      
+      // Upload file if selected
+      if (userFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', userFile);
+          formData.append('pairId', pair.id);
+          formData.append('userId', currentUser.id);
+          
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            fileUrl = result.fileUrl;
+          }
+        } catch (error) {
+          console.error('File upload failed:', error);
+        }
+      }
+
+      const submitData = {
+        pairId: pair.id,
+        userId: currentUser.id,
+        answer: userActivityAnswer.trim(),
+        fileUrl: fileUrl
+      };
+      
+      console.log('Submitting activity answer:', submitData);
+      socketRef.current.emit('submit-activity-answer', submitData);
+      setIsActivitySubmitted(true);
+    }
+  };
+
   console.log(partnerAnswer)
 
   return (
@@ -594,6 +699,30 @@ function ActivityScreen({
             </div>
           </div>
 
+          {/* File Upload for Question */}
+          <div>
+            <label className="block text-black font-semibold mb-3 text-lg">
+              📎 แนบไฟล์ (ไม่บังคับ)
+            </label>
+            <input
+              type="file"
+              onChange={handleFileChange}
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-white bg-opacity-50 text-black focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all duration-300"
+              disabled={isSubmitted}
+            />
+            {userFileUrl && (
+              <div className="mt-3">
+                <p className="text-sm text-gray-600 mb-2">ไฟล์ที่เลือก:</p>
+                {userFile?.type.startsWith('image/') ? (
+                  <img src={userFileUrl} alt="Preview" className="max-w-xs rounded-lg" />
+                ) : (
+                  <p className="text-sm text-blue-600">{userFile?.name}</p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="text-center">
             <button
               onClick={handleAnswerSubmit}
@@ -636,6 +765,17 @@ function ActivityScreen({
                   <div className="flex-1">
                     <h5 className="font-bold text-blue-800 text-lg mb-2">{currentUser?.nickname} (คุณ)</h5>
                     <p className="text-blue-700 text-lg leading-relaxed">{userAnswer}</p>
+                    {userFileUrl && (
+                      <div className="mt-3">
+                        {userFile?.type.startsWith('image/') ? (
+                          <img src={userFileUrl} alt="User file" className="max-w-xs rounded-lg" />
+                        ) : (
+                          <a href={userFileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                            📎 ดูไฟล์ที่แนบ
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -653,6 +793,13 @@ function ActivityScreen({
                       {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
                     </h5>
                     <p className="text-yellow-700 text-lg leading-relaxed">{partnerAnswer}</p>
+                    {partnerFileUrl && (
+                      <div className="mt-3">
+                        <a href={partnerFileUrl} target="_blank" rel="noopener noreferrer" className="text-yellow-600 underline">
+                          📎 ดูไฟล์ที่แนบ
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -686,7 +833,142 @@ function ActivityScreen({
           </p>
         </div>
 
-        <div className="text-center">
+        {/* Activity Form */}
+        <div className="space-y-6">
+          <div>
+            <label className="block text-black font-semibold mb-3 text-lg">
+            💭 คำตอบของคุณ
+            </label>
+            <textarea
+              value={userActivityAnswer}
+              onChange={(e) => setUserActivityAnswer(e.target.value)}
+              className="w-full px-6 py-4 rounded-xl border-2 border-gray-200 bg-white bg-opacity-50 text-black placeholder-gray-500 focus:border-green-400 focus:outline-none focus:ring-4 focus:ring-green-100 text-lg resize-none transition-all duration-300"
+              placeholder="เล่าเรื่องราวหรือประสบการณ์ที่เกี่ยวข้องกับกิจกรรมนี้..."
+              maxLength={300}
+              rows={4}
+              disabled={isActivitySubmitted}
+            />
+            <div className="text-right mt-2">
+              <span className="text-sm text-gray-500">{userActivityAnswer.length}/300</span>
+            </div>
+          </div>
+
+          {/* File Upload for Activity */}
+          <div>
+            <label className="block text-black font-semibold mb-3 text-lg">
+              📎 แนบไฟล์ (ไม่บังคับ)
+            </label>
+            <input
+              type="file"
+              onChange={handleFileChange}
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-white bg-opacity-50 text-black focus:border-green-400 focus:outline-none focus:ring-4 focus:ring-green-100 transition-all duration-300"
+              disabled={isActivitySubmitted}
+            />
+            {userFileUrl && (
+              <div className="mt-3">
+                <p className="text-sm text-gray-600 mb-2">ไฟล์ที่เลือก:</p>
+                {userFile?.type.startsWith('image/') ? (
+                  <img src={userFileUrl} alt="Preview" className="max-w-xs rounded-lg" />
+                ) : (
+                  <p className="text-sm text-green-600">{userFile?.name}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="text-center">
+            <button
+              onClick={handleActivitySubmit}
+              className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 transform ${
+                isActivitySubmitted
+                  ? 'bg-green-500 text-white cursor-not-allowed'
+                  : userActivityAnswer.trim() && socketRef.current?.connected
+                  ? 'bg-gradient-to-r from-green-400 to-emerald-400 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 shadow-lg hover:shadow-xl'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+              disabled={!userActivityAnswer.trim() || !socketRef.current?.connected || isActivitySubmitted}
+            >
+              {isActivitySubmitted ? '✅ ส่งคำตอบแล้ว' : '📤 ส่งคำตอบ'}
+            </button>
+          </div>
+        </div>
+
+        <div className="text-center mt-8">
+          <button
+            onClick={() => setShowActivityAnswer(!showActivityAnswer)}
+            className="bg-gradient-to-r from-green-400 to-emerald-400 text-white font-semibold py-3 px-8 rounded-xl hover:from-green-500 hover:to-emerald-500 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+          >
+            {showActivityAnswer ? '🙈 ซ่อนคำตอบ' : '👀 ดูคำตอบทั้งคู่'}
+          </button>
+        </div>
+
+        {showActivityAnswer && (
+          <div className="mt-8 space-y-6 animate-fadeIn">
+            <div className="text-center">
+              <h4 className="text-xl font-bold text-black mb-4">🎯 คำตอบของทั้งคู่</h4>
+            </div>
+            
+            {/* User's own activity answer */}
+            {userActivityAnswer && (
+              <div className="bg-gradient-to-r from-green-100 to-green-200 rounded-2xl p-6 border-l-4 border-green-500">
+                <div className="flex items-start space-x-3">
+                  <div className="bg-green-500 rounded-full p-2">
+                    <span className="text-white text-lg">👤</span>
+                  </div>
+                  <div className="flex-1">
+                    <h5 className="font-bold text-green-800 text-lg mb-2">{currentUser?.nickname} (คุณ)</h5>
+                    <p className="text-green-700 text-lg leading-relaxed">{userActivityAnswer}</p>
+                    {userFileUrl && (
+                      <div className="mt-3">
+                        {userFile?.type.startsWith('image/') ? (
+                          <img src={userFileUrl} alt="User file" className="max-w-xs rounded-lg" />
+                        ) : (
+                          <a href={userFileUrl} target="_blank" rel="noopener noreferrer" className="text-green-600 underline">
+                            📎 ดูไฟล์ที่แนบ
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Partner's activity answer */}
+            {partnerActivityAnswer ? (
+              <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-6 border-l-4 border-yellow-500">
+                <div className="flex items-start space-x-3">
+                  <div className="bg-yellow-500 rounded-full p-2">
+                    <span className="text-white text-lg">👤</span>
+                  </div>
+                  <div className="flex-1">
+                    <h5 className="font-bold text-yellow-800 text-lg mb-2">
+                      {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
+                    </h5>
+                    <p className="text-yellow-700 text-lg leading-relaxed">{partnerActivityAnswer}</p>
+                    {partnerFileUrl && (
+                      <div className="mt-3">
+                        <a href={partnerFileUrl} target="_blank" rel="noopener noreferrer" className="text-yellow-600 underline">
+                          📎 ดูไฟล์ที่แนบ
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl p-6 text-center">
+                <div className="text-4xl mb-3">⏳</div>
+                <p className="text-gray-700 text-lg">
+                  {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname} ยังไม่ได้ส่งคำตอบ
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="text-center mt-8">
           <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-2xl p-6 border border-green-200">
             <div className="text-3xl mb-3">🎉</div>
             <p className="text-green-800 text-lg font-semibold">

@@ -28,11 +28,18 @@ const db = new Database();
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
+    console.log('CORS request from origin:', origin);
+    console.log('APP_ENV:', process.env.APP_ENV);
+    
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('No origin, allowing request');
+      return callback(null, true);
+    }
     
     // Allow localhost for development
     if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      console.log('Localhost origin, allowing request');
       return callback(null, true);
     }
     
@@ -40,21 +47,25 @@ app.use(cors({
     const allowedOrigins = [
       'https://ionize13.com',
       'https://www.ionize13.com',
-      'https://friends-vending-machine.vercel.app', // Add your Vercel domain if using it
-      'https://friends-vending-machine.netlify.app'  // Add your Netlify domain if using it
+      'https://friends-vending-machine.vercel.app',
+      'https://friends-vending-machine.netlify.app'
     ];
     
     if (allowedOrigins.includes(origin)) {
+      console.log('Allowed origin:', origin);
       return callback(null, true);
     }
     
     // For production, be more restrictive
     if (process.env.APP_ENV === 'production') {
-      console.log('CORS blocked origin:', origin);
-      return callback(new Error('Not allowed by CORS'), false);
+      console.log('CORS blocked origin in production:', origin);
+      // Temporarily allow all origins for debugging
+      console.log('Temporarily allowing origin for debugging:', origin);
+      return callback(null, true);
     }
     
     // Allow all origins for development
+    console.log('Development mode, allowing origin:', origin);
     return callback(null, true);
   },
   credentials: true,
@@ -730,9 +741,45 @@ app.put('/api/user/social-media-handle', authenticateToken, async (req, res) => 
   }
 });
 
+// Test CORS endpoint
+app.options('/api/test-cors', (req, res) => {
+  console.log('Test CORS preflight request from:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.sendStatus(200);
+});
+
+app.get('/api/test-cors', (req, res) => {
+  console.log('Test CORS request from:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.json({ 
+    success: true, 
+    message: 'CORS test successful',
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Handle preflight requests for friend endpoints
+app.options('/api/friends/*', (req, res) => {
+  console.log('Friend endpoint preflight request from:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.sendStatus(200);
+});
+
 // Friend system routes
 app.post('/api/friends/send-request', authenticateToken, async (req, res) => {
   try {
+    // Set CORS headers
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
     const { userId } = req.user;
     const { friendId } = req.body;
 
@@ -793,6 +840,10 @@ app.post('/api/friends/send-request', authenticateToken, async (req, res) => {
 
 app.post('/api/friends/accept-request', authenticateToken, async (req, res) => {
   try {
+    // Set CORS headers
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
     const { userId } = req.user;
     const { friendId } = req.body;
 

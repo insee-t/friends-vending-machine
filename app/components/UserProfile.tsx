@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 export const UserProfile: React.FC = () => {
-  const { user, logout, updateSocialMediaHandle, getFriends, getFriendRequests, acceptFriendRequest, rejectFriendRequest, testFriendEndpoint } = useAuth()
+  const { user, logout, updateSocialMediaHandle, getFriends, getFriendRequests, acceptFriendRequest, rejectFriendRequest, testFriendEndpoint, testAcceptFriendRequest } = useAuth()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isEditingSocialHandle, setIsEditingSocialHandle] = useState(false)
   const [socialHandleInput, setSocialHandleInput] = useState('')
@@ -251,8 +251,8 @@ export const UserProfile: React.FC = () => {
                 )}
               </div>
 
-              {/* Debug Test Button */}
-              <div className="px-3 py-2 border-t border-gray-100">
+              {/* Debug Test Buttons */}
+              <div className="px-3 py-2 border-t border-gray-100 space-y-2">
                 <button
                   onClick={async () => {
                     console.log('Testing friend endpoint...');
@@ -263,6 +263,17 @@ export const UserProfile: React.FC = () => {
                   className="w-full text-left px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm"
                 >
                   🧪 Test Friend Endpoint
+                </button>
+                <button
+                  onClick={async () => {
+                    console.log('Testing accept friend request...');
+                    const result = await testAcceptFriendRequest();
+                    console.log('Accept test result:', result);
+                    alert(result ? 'Accept test successful!' : 'Accept test failed!');
+                  }}
+                  className="w-full text-left px-3 py-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors text-sm"
+                >
+                  🧪 Test Accept Friend Request
                 </button>
               </div>
               

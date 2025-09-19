@@ -43,7 +43,7 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Allow your production domains
+    // Allow your production 1domains
     const allowedOrigins = [
       'https://api.ionize13.com',
       'https://ionize13.com',
@@ -886,13 +886,17 @@ app.post('/api/friends/accept-request', authenticateToken, async (req, res) => {
     const { friendId } = req.body;
 
     if (!friendId) {
+      console.log('Missing friendId in request body');
       return res.status(400).json({ 
         success: false, 
         message: 'Friend ID is required' 
       });
     }
 
+    console.log('Attempting to accept friend request:', { userId, friendId });
     const result = await db.acceptFriendRequest(userId, friendId);
+    console.log('Friend request accepted successfully:', result);
+    
     res.json({
       success: true,
       message: 'Friend request accepted successfully',
@@ -901,6 +905,13 @@ app.post('/api/friends/accept-request', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Accept friend request error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      userId: req.user?.userId,
+      friendId: req.body?.friendId
+    });
+    
     if (error.message === 'No pending friend request found') {
       res.status(400).json({ 
         success: false, 
@@ -909,7 +920,8 @@ app.post('/api/friends/accept-request', authenticateToken, async (req, res) => {
     } else {
       res.status(500).json({ 
         success: false, 
-        message: 'Internal server error' 
+        message: 'Internal server error',
+        error: error.message // Include error message for debugging
       });
     }
   }

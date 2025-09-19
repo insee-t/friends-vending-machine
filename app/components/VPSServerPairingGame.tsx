@@ -198,13 +198,13 @@ function NicknameInput({ onSubmit }: { onSubmit: (nickname: string) => void }) {
   }
 
   return (
-    <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8 max-w-md mx-auto">
+    <div className="bg-white backdrop-blur-lg rounded-2xl p-8 max-w-md mx-auto">
       <div className="text-center mb-6">
         <div className="text-6xl mb-4">👋</div>
-        <h2 className="text-2xl font-bold text-white mb-2">
+        <h2 className="text-2xl font-bold text-black mb-2">
           ยินดีต้อนรับ!
         </h2>
-        <p className="text-white opacity-80">
+        <p className="text-black opacity-80">
           กรอกชื่อเล่นของคุณเพื่อเริ่มต้น
         </p>
       </div>
@@ -215,7 +215,7 @@ function NicknameInput({ onSubmit }: { onSubmit: (nickname: string) => void }) {
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-white placeholder-white placeholder-opacity-60 focus:border-opacity-60 focus:outline-none text-center text-lg"
+            className="w-full px-4 py-3 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-black placeholder-black placeholder-opacity-60 focus:border-opacity-60 focus:outline-none text-center text-lg"
             placeholder="ชื่อเล่นของคุณ"
             maxLength={20}
             required
@@ -251,22 +251,22 @@ function WaitingRoom({
   const otherWaitingUsers = waitingUsers.filter(user => user.id !== currentUser?.id)
   
   return (
-    <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8 max-w-2xl mx-auto">
+    <div className="bg-white backdrop-blur-lg rounded-2xl p-8 max-w-2xl mx-auto">
       <div className="text-center">
         <div className="text-6xl mb-6">⏳</div>
-        <h2 className="text-2xl font-bold text-white mb-4">
+        <h2 className="text-2xl font-bold text-black mb-4">
           ห้องรอ
         </h2>
-        <p className="text-lg text-white opacity-80 mb-6">
+        <p className="text-lg text-black opacity-80 mb-6">
           {waitingMessage}
         </p>
 
         {/* Current User */}
         <div className="bg-white bg-opacity-20 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-white text-lg">
+          <h3 className="font-semibold text-black text-lg">
             คุณ: {currentUser?.nickname || 'กำลังเชื่อมต่อ...'}
           </h3>
-          <p className="text-white opacity-80">
+          <p className="text-black opacity-80">
             กำลังรอเพื่อนใหม่... ({waitingUsers.length} คนในห้องรอ)
           </p>
         </div>
@@ -274,11 +274,11 @@ function WaitingRoom({
         {/* Other Users */}
         {otherWaitingUsers.length > 0 && (
           <div className="space-y-3 mb-6">
-            <h3 className="text-white font-semibold">ผู้เข้าร่วมคนอื่น:</h3>
+            <h3 className="text-black font-semibold">ผู้เข้าร่วมคนอื่น:</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {otherWaitingUsers.map(user => (
                 <div key={user.id} className="bg-white bg-opacity-20 rounded-lg p-3">
-                  <span className="text-white font-medium">
+                  <span className="text-black font-medium">
                     {user.nickname}
                   </span>
                 </div>
@@ -289,14 +289,14 @@ function WaitingRoom({
 
         {/* Instructions */}
         <div className="bg-blue-400 bg-opacity-20 rounded-lg p-4 mb-6">
-          <p className="text-blue-200 text-sm">
+          <p className="text-black text-sm">
             💡 <strong>วิธีทดสอบ:</strong> เปิดเว็บไซต์นี้บนอุปกรณ์อื่นหรือให้เพื่อนเปิดเว็บไซต์เดียวกัน 
             กรอกชื่อเล่นแล้วรอในห้องรอ จะมีการจับคู่อัตโนมัติ!
           </p>
         </div>
 
         {/* Debug Info */}
-        <div className="bg-gray-400 bg-opacity-20 rounded-lg p-4 mb-6">
+        {/* <div className="bg-gray-400 bg-opacity-20 rounded-lg p-4 mb-6">
           <p className="text-gray-200 text-xs">
             <strong>Debug:</strong> Total users: {allUsers.length}, Waiting: {waitingUsers.length}
           </p>
@@ -306,7 +306,7 @@ function WaitingRoom({
           <p className="text-gray-200 text-xs mt-1">
             <strong>Connection:</strong> {connectionStatus}
           </p>
-        </div>
+        </div> */}
 
         {/* Loading Animation */}
         <div className="mt-8">
@@ -321,7 +321,7 @@ function WaitingRoom({
         <div className="mt-6">
           <button
             onClick={onLeave}
-            className="bg-red-400 bg-opacity-20 text-red-200 px-4 py-2 rounded-lg hover:bg-opacity-30 transition-all"
+            className="bg-red-400 text-black px-4 py-2 rounded-lg hover:bg-opacity-30 transition-all"
           >
             🚪 ออกจากห้องรอ
           </button>
@@ -334,10 +334,10 @@ function WaitingRoom({
 // Pairing Result Component
 function PairingResult({ pair }: { pair: Pair }) {
   return (
-    <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8 max-w-2xl mx-auto">
+    <div className="bg-white backdrop-blur-lg rounded-2xl p-8 max-w-2xl mx-auto">
       <div className="text-center">
         <div className="text-6xl mb-6">🎉</div>
-        <h2 className="text-2xl font-bold text-white mb-6">
+        <h2 className="text-2xl font-bold text-black mb-6">
           พบเพื่อนใหม่แล้ว!
         </h2>
 
@@ -346,7 +346,7 @@ function PairingResult({ pair }: { pair: Pair }) {
           <div className="flex justify-center items-center space-x-4">
             <div className="bg-white bg-opacity-20 rounded-lg p-4 text-center">
               <div className="text-2xl mb-2">👤</div>
-              <h3 className="font-semibold text-white text-lg">
+              <h3 className="font-semibold text-black text-lg">
                 {pair.user1.nickname}
               </h3>
             </div>
@@ -355,14 +355,14 @@ function PairingResult({ pair }: { pair: Pair }) {
 
             <div className="bg-white bg-opacity-20 rounded-lg p-4 text-center">
               <div className="text-2xl mb-2">👤</div>
-              <h3 className="font-semibold text-white text-lg">
+              <h3 className="font-semibold text-black text-lg">
                 {pair.user2.nickname}
               </h3>
             </div>
           </div>
 
           <div className="bg-yellow-400 bg-opacity-20 rounded-lg p-4">
-            <p className="text-yellow-200 text-lg">
+            <p className="text-black text-lg">
               กำลังเตรียมกิจกรรมสนุกๆ ให้คุณ...
             </p>
           </div>
@@ -435,16 +435,16 @@ function ActivityScreen({
         </p>
       </div>
 
-      <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8">
+      <div className="bg-white backdrop-blur-lg rounded-2xl p-8">
         <div className="text-center mb-6">
           <div className="text-4xl mb-4">❓</div>
-          <h3 className="text-xl font-semibold text-white mb-4">
-            คำถามละลายน้ำแข็ง
+          <h3 className="text-xl font-semibold text-black mb-4">
+            คำถาม Ice-Breaking
           </h3>
         </div>
 
         <div className="bg-white bg-opacity-20 rounded-lg p-6 mb-6">
-          <p className="text-white text-lg text-center">
+          <p className="text-black text-lg text-center">
             {pair.question}
           </p>
         </div>
@@ -453,7 +453,7 @@ function ActivityScreen({
           <textarea
             value={userAnswer}
             onChange={(e) => setUserAnswer(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-white placeholder-white placeholder-opacity-60 focus:border-opacity-60 focus:outline-none text-center text-lg"
+            className="w-full px-4 py-3 rounded-lg border-2 border-gray border-opacity-30 bg-white bg-opacity-10 text-black placeholder-white placeholder-opacity-60 focus:border-opacity-60 focus:outline-none text-center text-lg"
             placeholder="พิมพ์คำตอบของคุณที่นี่..."
             maxLength={200}
             rows={4}
@@ -509,23 +509,23 @@ function ActivityScreen({
         )}
       </div>
 
-      <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8">
+      <div className="bg-white backdrop-blur-lg rounded-2xl p-8">
         <div className="text-center mb-6">
           <div className="text-4xl mb-4">🎯</div>
-          <h3 className="text-xl font-semibold text-white mb-4">
+          <h3 className="text-xl font-semibold text-black mb-4">
             กิจกรรมสนุก
           </h3>
         </div>
 
         <div className="bg-white bg-opacity-20 rounded-lg p-6 mb-6">
-          <p className="text-white text-lg text-center">
+          <p className="text-black text-lg text-center">
             {pair.activity}
           </p>
         </div>
 
         <div className="text-center">
           <div className="bg-green-400 bg-opacity-20 rounded-lg p-4 mb-4">
-            <p className="text-green-200">
+            <p className="text-black">
               🎉 ทำกิจกรรมนี้ด้วยกันและสนุกไปกับเพื่อนใหม่!
             </p>
           </div>
@@ -549,3 +549,4 @@ function ActivityScreen({
     </div>
   );
 }
+

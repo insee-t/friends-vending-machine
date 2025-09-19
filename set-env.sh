@@ -25,3 +25,6 @@ echo "   cd /var/www/friends-vending/server"
 echo "   pm2 restart friends-vending"
 
 
+
+
+

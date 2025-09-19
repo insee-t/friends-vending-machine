@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 interface User {
   id: string
   nickname: string
+  socialMediaHandle?: string
   joinedAt: number
   status: 'waiting' | 'paired'
   socketId: string
@@ -104,10 +105,12 @@ export default function VPSServerPairingGame() {
 
   const handleNicknameSubmit = (nickname: string) => {
     if (socketRef.current && socketRef.current.id) {
-      socketRef.current.emit('join-waiting', { nickname })
+      const socialMediaHandle = authUser?.socialMediaHandle || null
+      socketRef.current.emit('join-waiting', { nickname, socialMediaHandle })
       setCurrentUser({
         id: socketRef.current.id,
         nickname,
+        socialMediaHandle: socialMediaHandle || undefined,
         joinedAt: Date.now(),
         status: 'waiting',
         socketId: socketRef.current.id
@@ -452,6 +455,11 @@ function PairingResult({ pair }: { pair: Pair }) {
               <h3 className="font-semibold text-black text-lg">
                 {pair.user1.nickname}
               </h3>
+              {pair.user1.socialMediaHandle && (
+                <p className="text-sm text-gray-600 mt-1">
+                  📱 {pair.user1.socialMediaHandle}
+                </p>
+              )}
             </div>
 
             <div className="text-4xl">🤗</div>
@@ -461,6 +469,11 @@ function PairingResult({ pair }: { pair: Pair }) {
               <h3 className="font-semibold text-black text-lg">
                 {pair.user2.nickname}
               </h3>
+              {pair.user2.socialMediaHandle && (
+                <p className="text-sm text-gray-600 mt-1">
+                  📱 {pair.user2.socialMediaHandle}
+                </p>
+              )}
             </div>
           </div>
 
@@ -671,13 +684,19 @@ function ActivityScreen({
           กิจกรรมสนุกๆ
         </h2>
         <div className="flex items-center justify-center space-x-4 mb-6">
-          <div className="bg-white bg-opacity-20 rounded-full px-4 py-2">
-            <span className="text-white font-semibold">👤 {pair.user1.nickname}</span>
+          <div className="bg-white bg-opacity-20 rounded-full px-4 py-2 text-center">
+            <div className="text-white font-semibold">👤 {pair.user1.nickname}</div>
+            {pair.user1.socialMediaHandle && (
+              <div className="text-xs text-gray-200">📱 {pair.user1.socialMediaHandle}</div>
+            )}
           </div>
           <div className="text-2xl animate-bounce">🤗
           </div>
-          <div className="bg-white bg-opacity-20 rounded-full px-4 py-2">
-            <span className="text-white font-semibold">👤 {pair.user2.nickname}</span>
+          <div className="bg-white bg-opacity-20 rounded-full px-4 py-2 text-center">
+            <div className="text-white font-semibold">👤 {pair.user2.nickname}</div>
+            {pair.user2.socialMediaHandle && (
+              <div className="text-xs text-gray-200">📱 {pair.user2.socialMediaHandle}</div>
+            )}
           </div>
         </div>
       </div>
@@ -777,6 +796,11 @@ function ActivityScreen({
                   <div className="flex-1">
                     <h5 className="font-bold text-yellow-800 text-lg mb-2">
                       {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
+                      {(pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle) && (
+                        <span className="text-sm text-yellow-600 ml-2">
+                          📱 {pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle}
+                        </span>
+                      )}
                     </h5>
                     <p className="text-yellow-700 text-lg leading-relaxed">{partnerAnswer}</p>
                   </div>
@@ -786,7 +810,12 @@ function ActivityScreen({
               <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl p-6 text-center">
                 <div className="text-4xl mb-3">⏳</div>
                 <p className="text-gray-700 text-lg">
-                  {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname} ยังไม่ได้ส่งคำตอบ
+                  {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
+                  {(pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle) && (
+                    <span className="text-sm text-gray-500 ml-2">
+                      📱 {pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle}
+                    </span>
+                  )} ยังไม่ได้ส่งคำตอบ
                 </p>
               </div>
             )}
@@ -924,6 +953,11 @@ function ActivityScreen({
                   <div className="flex-1">
                     <h5 className="font-bold text-yellow-800 text-lg mb-2">
                       {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
+                      {(pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle) && (
+                        <span className="text-sm text-yellow-600 ml-2">
+                          📱 {pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle}
+                        </span>
+                      )}
                     </h5>
                     <p className="text-yellow-700 text-lg leading-relaxed">{partnerActivityAnswer}</p>
                     {partnerFileUrl && (
@@ -944,7 +978,12 @@ function ActivityScreen({
               <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl p-6 text-center">
                 <div className="text-4xl mb-3">⏳</div>
                 <p className="text-gray-700 text-lg">
-                  {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname} ยังไม่ได้ส่งคำตอบ
+                  {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
+                  {(pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle) && (
+                    <span className="text-sm text-gray-500 ml-2">
+                      📱 {pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle}
+                    </span>
+                  )} ยังไม่ได้ส่งคำตอบ
                 </p>
               </div>
             )}

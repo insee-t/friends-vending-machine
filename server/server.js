@@ -240,10 +240,11 @@ io.on('connection', (socket) => {
 
   // User joins the waiting room
   socket.on('join-waiting', (data) => {
-    const { nickname } = data;
+    const { nickname, socialMediaHandle } = data;
     const user = {
       id: socket.id,
       nickname: nickname.trim(),
+      socialMediaHandle: socialMediaHandle || null,
       joinedAt: Date.now(),
       status: 'waiting',
       socketId: socket.id
@@ -593,6 +594,7 @@ app.get('/api/auth/verify', authenticateToken, async (req, res) => {
       id: user.id,
       email: user.email,
       nickname: user.nickname,
+      socialMediaHandle: user.social_media_handle,
       createdAt: user.created_at
     };
     
@@ -630,6 +632,7 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
       id: user.id,
       email: user.email,
       nickname: user.nickname,
+      socialMediaHandle: user.social_media_handle,
       createdAt: user.created_at,
       lastLogin: user.last_login,
       gameHistory: gameHistory
@@ -642,6 +645,48 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Profile error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+});
+
+// Update social media handle
+app.put('/api/user/social-media-handle', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { socialMediaHandle } = req.body;
+
+    // Validate input
+    if (socialMediaHandle && socialMediaHandle.length > 100) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Social media handle must be 100 characters or less' 
+      });
+    }
+
+    // Update social media handle
+    await db.updateSocialMediaHandle(userId, socialMediaHandle);
+
+    // Get updated user data
+    const user = await db.getUserByEmail(req.user.email);
+    
+    const userData = {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      socialMediaHandle: user.social_media_handle,
+      createdAt: user.created_at
+    };
+    
+    res.json({
+      success: true,
+      user: userData
+    });
+
+  } catch (error) {
+    console.error('Update social media handle error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 

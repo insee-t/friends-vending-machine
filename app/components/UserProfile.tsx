@@ -4,8 +4,33 @@ import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 export const UserProfile: React.FC = () => {
-  const { user, logout } = useAuth()
+  const { user, logout, updateSocialMediaHandle } = useAuth()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isEditingSocialHandle, setIsEditingSocialHandle] = useState(false)
+  const [socialHandleInput, setSocialHandleInput] = useState('')
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  const handleSocialHandleSubmit = async () => {
+    if (isUpdating) return
+    
+    setIsUpdating(true)
+    const success = await updateSocialMediaHandle(socialHandleInput.trim())
+    if (success) {
+      setIsEditingSocialHandle(false)
+      setSocialHandleInput('')
+    }
+    setIsUpdating(false)
+  }
+
+  const handleEditSocialHandle = () => {
+    setSocialHandleInput(user.socialMediaHandle || '')
+    setIsEditingSocialHandle(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditingSocialHandle(false)
+    setSocialHandleInput('')
+  }
 
   if (!user) return null
 
@@ -58,6 +83,51 @@ export const UserProfile: React.FC = () => {
             <div className="p-2">
               <div className="px-3 py-2 text-sm text-gray-500">
                 สมาชิกตั้งแต่: {new Date(user.createdAt).toLocaleDateString('th-TH')}
+              </div>
+              
+              {/* Social Media Handle Section */}
+              <div className="px-3 py-2 border-t border-gray-100">
+                <div className="text-sm text-gray-600 mb-2">Social Media Handle</div>
+                {isEditingSocialHandle ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={socialHandleInput}
+                      onChange={(e) => setSocialHandleInput(e.target.value)}
+                      placeholder="@username หรือ social media handle"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      maxLength={100}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSocialHandleSubmit}
+                        disabled={isUpdating}
+                        className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                      >
+                        {isUpdating ? 'กำลังบันทึก...' : 'บันทึก'}
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={isUpdating}
+                        className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                      >
+                        ยกเลิก
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-800">
+                      {user.socialMediaHandle || 'ยังไม่ได้ตั้งค่า'}
+                    </div>
+                    <button
+                      onClick={handleEditSocialHandle}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      แก้ไข
+                    </button>
+                  </div>
+                )}
               </div>
               
               <button

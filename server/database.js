@@ -30,6 +30,7 @@ class Database {
           email TEXT UNIQUE NOT NULL,
           nickname TEXT NOT NULL,
           password_hash TEXT NOT NULL,
+          social_media_handle TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           last_login DATETIME,
           is_active BOOLEAN DEFAULT 1
@@ -76,15 +77,15 @@ class Database {
 
   async createUser(userData) {
     return new Promise((resolve, reject) => {
-      const { id, email, nickname, password } = userData;
+      const { id, email, nickname, password, socialMediaHandle } = userData;
       const hashedPassword = bcrypt.hashSync(password, 10);
 
       const sql = `
-        INSERT INTO users (id, email, nickname, password_hash)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO users (id, email, nickname, password_hash, social_media_handle)
+        VALUES (?, ?, ?, ?, ?)
       `;
 
-      this.db.run(sql, [id, email, nickname, hashedPassword], function(err) {
+      this.db.run(sql, [id, email, nickname, hashedPassword, socialMediaHandle || null], function(err) {
         if (err) {
           if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
             reject(new Error('User already exists'));
@@ -96,6 +97,7 @@ class Database {
             id,
             email,
             nickname,
+            socialMediaHandle: socialMediaHandle || null,
             createdAt: new Date().toISOString()
           });
         }
@@ -133,6 +135,7 @@ class Database {
             id: user.id,
             email: user.email,
             nickname: user.nickname,
+            socialMediaHandle: user.social_media_handle,
             createdAt: user.created_at
           });
         } else {
@@ -149,6 +152,20 @@ class Database {
       const sql = 'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?';
       
       this.db.run(sql, [userId], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  async updateSocialMediaHandle(userId, socialMediaHandle) {
+    return new Promise((resolve, reject) => {
+      const sql = 'UPDATE users SET social_media_handle = ? WHERE id = ?';
+      
+      this.db.run(sql, [socialMediaHandle, userId], function(err) {
         if (err) {
           reject(err);
         } else {

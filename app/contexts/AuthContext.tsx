@@ -6,6 +6,7 @@ interface User {
   id: string
   email: string
   nickname: string
+  socialMediaHandle?: string
   createdAt: string
 }
 
@@ -14,6 +15,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>
   signup: (email: string, password: string, nickname: string) => Promise<boolean>
   logout: () => void
+  updateSocialMediaHandle: (socialMediaHandle: string) => Promise<boolean>
   isLoading: boolean
   isAuthenticated: boolean
 }
@@ -137,11 +139,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null)
   }
 
+  const updateSocialMediaHandle = async (socialMediaHandle: string): Promise<boolean> => {
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
+        ? 'https://api.ionize13.com'
+        : 'http://localhost:3000'
+      
+      const token = localStorage.getItem('authToken')
+      if (!token) return false
+
+      const response = await fetch(`${API_BASE}/api/user/social-media-handle`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ socialMediaHandle }),
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setUser(data.user)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Update social media handle error:', error)
+      return false
+    }
+  }
+
   const value: AuthContextType = {
     user,
     login,
     signup,
     logout,
+    updateSocialMediaHandle,
     isLoading,
     isAuthenticated: !!user,
   }

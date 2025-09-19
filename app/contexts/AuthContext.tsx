@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Verify token with server
       const API_BASE = process.env.NODE_ENV === 'production' 
         ? 'https://api.ionize13.com'
-        : 'http://localhost:3000'
+        : 'https://api.ionize13.com'
       
       fetch(`${API_BASE}/api/auth/verify`, {
         headers: {

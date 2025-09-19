@@ -91,7 +91,7 @@ cp -r out/* server/../out/ 2>/dev/null || mkdir -p server/../out && cp -r out/* 
 # Start the application with PM2
 echo "🚀 Starting application with PM2..."
 cd server
-pm2 start server.js --name "friends-vending"
+pm2 start server.js --name "friends-vending" --cwd /var/www/friends-vending/server
 pm2 save
 pm2 startup
 

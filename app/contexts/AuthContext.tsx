@@ -1,7 +1,6 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import 'dotenv/config'
 
 interface User {
   id: string
@@ -42,9 +41,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const token = localStorage.getItem('authToken')
     if (token) {
       // Verify token with server
-      const API_BASE = process.env.NODE_ENV === 'production' 
-        ? 'https://api.ionize13.com'
-        : 'http://localhost:3000'
+      
+      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
+        ? (process.env.NEXT_PUBLIC_API_URL_PROD || 'https://api.ionize13.com')
+        : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000')
       
       fetch(`${API_BASE}/api/auth/verify`, {
         method: 'GET',
@@ -75,7 +75,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const API_BASE = process.env.NODE_ENV === 'production' 
+      console.log('APP_ENV:', process.env.NEXT_PUBLIC_APP_ENV)
+      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
         ? 'https://api.ionize13.com'
         : 'http://localhost:3000'
       
@@ -104,7 +105,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signup = async (email: string, password: string, nickname: string): Promise<boolean> => {
     try {
-      const API_BASE = process.env.NODE_ENV === 'production' 
+      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
         ? 'https://api.ionize13.com'
         : 'http://localhost:3000'
       

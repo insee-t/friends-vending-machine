@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { useAuth } from '../contexts/AuthContext'
-import 'dotenv/config'
+
+
 
 interface User {
   id: string
@@ -34,7 +35,7 @@ export default function VPSServerPairingGame() {
   const socketRef = useRef<Socket | null>(null)
 
   // Server URL
-  const SERVER_URL = process.env.NODE_ENV === 'production' 
+  const SERVER_URL = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
     ? 'https://api.ionize13.com'
     : 'http://localhost:3000'
 

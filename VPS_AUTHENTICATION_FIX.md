@@ -100,13 +100,13 @@ npm run build
 
 ```bash
 # Set production environment
-export NODE_ENV=production
+export APP_ENV=production
 
 # Set JWT secret (important for security)
 export JWT_SECRET="your-super-secure-secret-key-change-this"
 
 # Make it permanent
-echo 'export NODE_ENV=production' >> ~/.bashrc
+echo 'export APP_ENV=production' >> ~/.bashrc
 echo 'export JWT_SECRET="your-super-secure-secret-key-change-this"' >> ~/.bashrc
 ```
 

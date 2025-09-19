@@ -9,7 +9,9 @@ const jwt = require('jsonwebtoken');
 const Database = require('./database');
 const multer = require('multer');
 const fs = require('fs');
-require('dotenv').config()
+
+// Load environment variables
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const server = http.createServer(app);
@@ -67,7 +69,7 @@ app.use((req, res, next) => {
 });
 
 // Serve Next.js build (only in production)
-if (process.env.NODE_ENV === 'production') {
+if (process.env.APP_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../out')));
 }
 
@@ -635,7 +637,7 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
 });
 
 // Serve the Next.js app (only in production)
-if (process.env.NODE_ENV === 'production') {
+if (process.env.APP_ENV === 'production') {
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../out/index.html'));
   });

@@ -100,12 +100,12 @@ export default function Home() {
               </button>
 
               {/* How to Use Button */}
-              <button className="how-to-button px-8 py-4 flex items-center gap-3 text-lg font-semibold text-gray-700 min-w-[200px]">
+              {/* <button className="how-to-button px-8 py-4 flex items-center gap-3 text-lg font-semibold text-gray-700 min-w-[200px]">
                 <div className="w-6 h-6 rounded-full border-2 border-gray-400 flex items-center justify-center">
                   <span className="text-gray-400 font-bold text-sm">?</span>
                 </div>
                 วิธีการใช้งาน
-              </button>
+              </button> */}
             </div>
           </div>
         </div>

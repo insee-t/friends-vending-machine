@@ -5,8 +5,11 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'เครื่องขายเพื่อน - Friend Vending Machine',
+  title: 'Friends Vending Machine',
   description: 'โครงการเพื่อส่งเสริมความสัมพันธ์ในคณะวิศวกรรมคอมพิวเตอร์ มหาวิทยาลัยขอนแก่น',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({

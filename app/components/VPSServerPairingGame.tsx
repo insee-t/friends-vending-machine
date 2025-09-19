@@ -351,7 +351,7 @@ function PairingResult({ pair }: { pair: Pair }) {
               </h3>
             </div>
 
-            <div className="text-4xl">💕</div>
+            <div className="text-4xl">🤗</div>
 
             <div className="bg-white bg-opacity-20 rounded-lg p-4 text-center">
               <div className="text-2xl mb-2">👤</div>
@@ -448,7 +448,8 @@ function ActivityScreen({
           <div className="bg-white bg-opacity-20 rounded-full px-4 py-2">
             <span className="text-white font-semibold">👤 {pair.user1.nickname}</span>
           </div>
-          <div className="text-2xl animate-bounce">💕</div>
+          <div className="text-2xl animate-bounce">🤗
+          </div>
           <div className="bg-white bg-opacity-20 rounded-full px-4 py-2">
             <span className="text-white font-semibold">👤 {pair.user2.nickname}</span>
           </div>
@@ -598,16 +599,16 @@ function ActivityScreen({
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         <button
           onClick={onNewGame}
-          className="bg-gradient-to-r from-blue-400 to-purple-400 text-white font-semibold py-4 px-8 rounded-xl hover:from-blue-500 hover:to-purple-500 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-lg"
+          className="bg-blue-400 text-white font-semibold py-4 px-8 rounded-xl hover:from-blue-500 hover:to-purple-500 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-lg"
         >
           🔄 หาเพื่อนใหม่
         </button>
-        <button
+        {/* <button
           onClick={onLeave}
-          className="bg-gradient-to-r from-gray-400 to-gray-600 text-white font-semibold py-4 px-8 rounded-xl hover:from-gray-500 hover:to-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-lg"
+          className="bg-orange-400 text-white font-semibold py-3 px-8 rounded-lg hover:from-yellow-500 hover:to-orange-500 transition-all transform hover:scale-105"
         >
           🏠 กลับหน้าแรก
-        </button>
+        </button> */}
       </div>
     </div>
   );

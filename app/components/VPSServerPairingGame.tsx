@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
+import { useAuth } from '../contexts/AuthContext'
 
 interface User {
   id: string
@@ -21,18 +22,28 @@ interface Pair {
 }
 
 export default function VPSServerPairingGame() {
+  const { user: authUser, isAuthenticated } = useAuth()
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [currentPair, setCurrentPair] = useState<Pair | null>(null)
   const [gamePhase, setGamePhase] = useState<'nickname' | 'waiting' | 'paired' | 'activity'>('nickname')
   const [waitingMessage, setWaitingMessage] = useState('')
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
+  const [userManuallyLeft, setUserManuallyLeft] = useState(false)
   const socketRef = useRef<Socket | null>(null)
 
   // Server URL
   const SERVER_URL = process.env.NODE_ENV === 'production' 
     ? 'https://api.ionize13.com'
     : 'http://localhost:3000'
+
+  // Auto-login with authenticated user's nickname
+  useEffect(() => {
+    if (isAuthenticated && authUser && connectionStatus === 'connected' && gamePhase === 'nickname' && !userManuallyLeft) {
+      // Automatically use the logged-in user's nickname
+      handleNicknameSubmit(authUser.nickname)
+    }
+  }, [isAuthenticated, authUser, connectionStatus, gamePhase, userManuallyLeft])
 
   // Initialize socket connection
   useEffect(() => {
@@ -100,6 +111,7 @@ export default function VPSServerPairingGame() {
         socketId: socketRef.current.id
       })
       setGamePhase('waiting')
+      setUserManuallyLeft(false) // Reset the flag when user starts a new game
     }
   }
 
@@ -113,6 +125,7 @@ export default function VPSServerPairingGame() {
     setCurrentPair(null)
     setGamePhase('nickname')
     setWaitingMessage('')
+    setUserManuallyLeft(false) // Reset the flag when user starts a new game
   }
 
   const leaveGame = () => {
@@ -125,6 +138,7 @@ export default function VPSServerPairingGame() {
     setCurrentPair(null)
     setGamePhase('nickname')
     setWaitingMessage('')
+    setUserManuallyLeft(true) // Prevent auto-login after manual leave
   }
 
   return (
@@ -155,7 +169,17 @@ export default function VPSServerPairingGame() {
 
         {/* Game Content */}
         {gamePhase === 'nickname' && (
-          <NicknameInput onSubmit={handleNicknameSubmit} />
+          <NicknameInput 
+            onSubmit={handleNicknameSubmit} 
+            isAuthenticated={isAuthenticated}
+            authUser={authUser}
+            userManuallyLeft={userManuallyLeft}
+            onBackToHome={() => {
+              setUserManuallyLeft(false)
+              // This will trigger the parent component to go back to home
+              window.location.href = '/'
+            }}
+          />
         )}
 
         {gamePhase === 'waiting' && (
@@ -187,8 +211,21 @@ export default function VPSServerPairingGame() {
 }
 
 // Nickname Input Component
-function NicknameInput({ onSubmit }: { onSubmit: (nickname: string) => void }) {
+function NicknameInput({ 
+  onSubmit, 
+  isAuthenticated, 
+  authUser,
+  userManuallyLeft,
+  onBackToHome
+}: { 
+  onSubmit: (nickname: string) => void
+  isAuthenticated: boolean
+  authUser: any
+  userManuallyLeft: boolean
+  onBackToHome: () => void
+}) {
   const [nickname, setNickname] = useState('')
+  const [useCustomName, setUseCustomName] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -202,33 +239,93 @@ function NicknameInput({ onSubmit }: { onSubmit: (nickname: string) => void }) {
       <div className="text-center mb-6">
         <div className="text-6xl mb-4">👋</div>
         <h2 className="text-2xl font-bold text-black mb-2">
-          ยินดีต้อนรับ!
+          {isAuthenticated && !useCustomName 
+            ? `สวัสดี ${authUser?.nickname}!` 
+            : isAuthenticated && useCustomName
+            ? 'ใช้ชื่ออื่น'
+            : 'ยินดีต้อนรับ!'
+          }
         </h2>
         <p className="text-black opacity-80">
-          กรอกชื่อเล่นของคุณเพื่อเริ่มต้น
+          {isAuthenticated && !useCustomName
+            ? 'กำลังเข้าสู่เกมด้วยชื่อของคุณ...' 
+            : 'กรอกชื่อเล่นของคุณเพื่อเริ่มต้น'
+          }
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <input
-            type="text"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-black placeholder-black placeholder-opacity-60 focus:border-opacity-60 focus:outline-none text-center text-lg"
-            placeholder="ชื่อเล่นของคุณ"
-            maxLength={20}
-            required
-          />
+      {isAuthenticated && !useCustomName ? (
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-center space-x-3">
+              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+                {authUser?.nickname?.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="font-semibold text-blue-900">{authUser?.nickname}</p>
+                <p className="text-sm text-blue-700">กำลังเข้าสู่เกม...</p>
+              </div>
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="inline-flex items-center space-x-2 text-gray-600">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span>กำลังเชื่อมต่อ...</span>
+            </div>
+          </div>
+          <div className="text-center">
+            <button
+              onClick={() => setUseCustomName(true)}
+              className="text-sm text-blue-600 hover:text-blue-700 underline"
+            >
+              ใช้ชื่ออื่นแทน
+            </button>
+          </div>
         </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <input
+              type="text"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-black placeholder-black placeholder-opacity-60 focus:border-opacity-60 focus:outline-none text-center text-lg"
+              placeholder="ชื่อเล่นของคุณ"
+              maxLength={20}
+              required
+            />
+          </div>
 
-        <button
-          type="submit"
-          className="w-full bg-gradient-to-r from-green-400 to-blue-400 text-white font-semibold py-3 px-6 rounded-lg hover:from-green-500 hover:to-blue-500 transition-all transform hover:scale-105"
-        >
-          🚀 เริ่มต้น
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="w-full bg-gradient-to-r from-green-400 to-blue-400 text-white font-semibold py-3 px-6 rounded-lg hover:from-green-500 hover:to-blue-500 transition-all transform hover:scale-105"
+          >
+            🚀 เริ่มต้น
+          </button>
+        </form>
+      )}
+      
+      {isAuthenticated && useCustomName && (
+        <div className="text-center mt-4">
+          <button
+            onClick={() => setUseCustomName(false)}
+            className="text-sm text-blue-600 hover:text-blue-700 underline"
+          >
+            กลับไปใช้ชื่อบัญชี ({authUser?.nickname})
+          </button>
+        </div>
+      )}
+      
+      {userManuallyLeft && (
+        <div className="text-center mt-4">
+          <button
+            onClick={onBackToHome}
+            className="text-sm text-gray-600 hover:text-gray-700 underline"
+          >
+            🏠 กลับหน้าแรก
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -255,7 +352,7 @@ function WaitingRoom({
       <div className="text-center">
         <div className="text-6xl mb-6">⏳</div>
         <h2 className="text-2xl font-bold text-black mb-4">
-          ห้องรอ
+          กำลังสุ่มหาเพื่อนให้คุณ...
         </h2>
         <p className="text-lg text-black opacity-80 mb-6">
           {waitingMessage}
@@ -320,8 +417,12 @@ function WaitingRoom({
         {/* Leave Button */}
         <div className="mt-6">
           <button
-            onClick={onLeave}
-            className="bg-red-400 text-white px-4 py-2 rounded-lg hover:bg-opacity-30 transition-all"
+            onClick={() => {
+              if (window.confirm('คุณแน่ใจหรือไม่ที่จะออกจากห้องรอ?')) {
+                onLeave()
+              }
+            }}
+            className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 shadow-lg"
           >
             🚪 ออกจากห้องรอ
           </button>

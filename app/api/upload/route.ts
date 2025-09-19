@@ -32,7 +32,9 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, buffer)
 
     // Return file URL - use full URL for production
-    const baseUrl = process.env.NODE_ENV === 'production' 
+    // Check if we're in production by looking at the request headers
+    const isProduction = request.headers.get('host')?.includes('ionize13.com') || process.env.NODE_ENV === 'production'
+    const baseUrl = isProduction 
       ? 'https://ionize13.com' 
       : 'http://localhost:3000'
     const fileUrl = `${baseUrl}/uploads/${filename}`

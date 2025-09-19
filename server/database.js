@@ -59,6 +59,14 @@ class Database {
             reject(err);
           } else {
             console.log('✅ Users table created/verified');
+            // Add social_media_handle column if it doesn't exist
+            this.db.run(`ALTER TABLE users ADD COLUMN social_media_handle TEXT`, (alterErr) => {
+              if (alterErr && !alterErr.message.includes('duplicate column name')) {
+                console.error('Error adding social_media_handle column:', alterErr);
+              } else if (!alterErr) {
+                console.log('✅ Added social_media_handle column to users table');
+              }
+            });
           }
         });
 

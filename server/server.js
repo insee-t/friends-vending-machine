@@ -302,7 +302,7 @@ io.on('connection', (socket) => {
 
   // Handle answer submission
   socket.on('submit-answer', (data) => {
-    const { pairId, userId, answer, fileUrl } = data;
+    const { pairId, userId, answer } = data;
     const pair = pairs.get(pairId);
     
     if (pair) {
@@ -317,8 +317,7 @@ io.on('connection', (socket) => {
         // Send the answer to the partner
         partnerSocket.emit('receive-answer', {
           userId: userId,
-          answer: answer,
-          fileUrl: fileUrl
+          answer: answer
         });
         console.log(`Answer sent to partner ${partnerId}`);
       } else {
@@ -455,7 +454,7 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     return res.status(400).json({ success: false, message: 'No file uploaded' });
   }
 
-  const fileUrl = `/uploads/${req.file.filename}`;
+  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
   res.json({ success: true, fileUrl });
 });
 

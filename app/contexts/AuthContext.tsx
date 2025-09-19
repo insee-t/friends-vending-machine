@@ -207,7 +207,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       console.log('Sending friend request:', {
         friendId,
-        currentUserId: authUser?.id,
         API_BASE
       })
 
@@ -241,7 +240,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       console.log('Accepting friend request:', {
         friendId,
-        currentUserId: authUser?.id,
         API_BASE
       })
 

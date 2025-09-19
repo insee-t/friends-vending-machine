@@ -434,6 +434,12 @@ function checkForPairing() {
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
+  // Skip authentication for OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    console.log('Skipping authentication for OPTIONS request:', req.path);
+    return next();
+  }
+  
   console.log('Authentication middleware called for:', req.path);
   console.log('Authorization header:', req.headers['authorization']);
   

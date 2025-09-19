@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import 'dotenv/config'
 
 interface User {
   id: string
@@ -43,12 +44,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Verify token with server
       const API_BASE = process.env.NODE_ENV === 'production' 
         ? 'https://api.ionize13.com'
-        : 'https://api.ionize13.com'
+        : 'http://localhost:3000'
       
       fetch(`${API_BASE}/api/auth/verify`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       })
       .then(res => res.json())
       .then(data => {
@@ -81,6 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
+        credentials: 'include'
       })
 
       const data = await response.json()
@@ -109,6 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password, nickname }),
+        credentials: 'include'
       })
 
       const data = await response.json()

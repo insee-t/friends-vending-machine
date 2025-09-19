@@ -568,11 +568,22 @@ function ActivityScreen({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    console.log('File selected:', file);
     if (file) {
+      console.log('File details:', {
+        name: file.name,
+        type: file.type,
+        size: file.size
+      });
       setUserFile(file);
       // Create preview URL
       const url = URL.createObjectURL(file);
       setUserFileUrl(url);
+      console.log('File preview URL created:', url);
+    } else {
+      console.log('No file selected');
+      setUserFile(null);
+      setUserFileUrl(null);
     }
   };
 
@@ -582,24 +593,33 @@ function ActivityScreen({
       
       // Upload file if selected
       if (userFile) {
+        console.log('Uploading file:', userFile.name, userFile.type, userFile.size);
         try {
           const formData = new FormData();
           formData.append('file', userFile);
           formData.append('pairId', pair.id);
           formData.append('userId', currentUser.id);
           
+          console.log('Sending file upload request...');
           const response = await fetch('/api/upload', {
             method: 'POST',
             body: formData,
           });
           
+          console.log('File upload response status:', response.status);
           if (response.ok) {
             const result = await response.json();
+            console.log('File upload result:', result);
             fileUrl = result.fileUrl;
+          } else {
+            const errorText = await response.text();
+            console.error('File upload failed with status:', response.status, errorText);
           }
         } catch (error) {
           console.error('File upload failed:', error);
         }
+      } else {
+        console.log('No file selected for upload');
       }
 
       const submitData = {
@@ -618,6 +638,8 @@ function ActivityScreen({
 
   console.log(partnerAnswer)
   console.log('Partner file URL state:', partnerFileUrl)
+  console.log('User file state:', userFile)
+  console.log('User file URL state:', userFileUrl)
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">

@@ -453,18 +453,23 @@ app.get('/api/users', (req, res) => {
 
 // File upload endpoint
 app.post('/api/upload', upload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, message: 'No file uploaded' });
-  }
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
 
-  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-  console.log('File uploaded successfully:', {
-    filename: req.file.filename,
-    originalName: req.file.originalname,
-    size: req.file.size,
-    fileUrl: fileUrl
-  });
-  res.json({ success: true, fileUrl });
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    console.log('File uploaded successfully:', {
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      fileUrl: fileUrl
+    });
+    res.json({ success: true, fileUrl });
+  } catch (error) {
+    console.error('File upload error:', error);
+    res.status(500).json({ success: false, message: 'File upload failed' });
+  }
 });
 
 // Serve uploaded files
@@ -657,7 +662,13 @@ const HOST = process.env.HOST || '0.0.0.0';
 // Initialize database and start server
 async function startServer() {
   try {
-    await db.init();
+    // Try to initialize database, but don't fail if it doesn't work
+    try {
+      await db.init();
+      console.log('✅ Database initialized successfully');
+    } catch (dbError) {
+      console.warn('⚠️ Database initialization failed, continuing without database:', dbError.message);
+    }
     
     server.listen(PORT, HOST, () => {
       console.log(`🚀 Server running on http://${HOST}:${PORT}`);
@@ -674,7 +685,11 @@ async function startServer() {
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server...');
-  db.close();
+  try {
+    db.close();
+  } catch (error) {
+    console.warn('Database close error:', error.message);
+  }
   server.close(() => {
     console.log('✅ Server closed');
     process.exit(0);

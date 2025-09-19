@@ -40,6 +40,7 @@ interface AuthContextType {
   getSentFriendRequests: () => Promise<FriendRequest[]>
   testFriendEndpoint: () => Promise<boolean>
   testAcceptFriendRequest: () => Promise<boolean>
+  testOptionsEndpoint: () => Promise<boolean>
   isLoading: boolean
   isAuthenticated: boolean
 }
@@ -440,6 +441,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
+  // Test OPTIONS endpoint specifically
+  const testOptionsEndpoint = async (): Promise<boolean> => {
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
+        ? 'https://api.ionize13.com'
+        : 'http://localhost:3000'
+      
+      console.log('Testing OPTIONS endpoint...')
+
+      const response = await fetch(`${API_BASE}/api/test-options`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+      console.log('OPTIONS test response:', data)
+      console.log('Response status:', response.status)
+      return response.ok
+    } catch (error) {
+      console.error('OPTIONS test error:', error)
+      return false
+    }
+  }
+
   const value: AuthContextType = {
     user,
     login,
@@ -455,6 +483,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     getSentFriendRequests,
     testFriendEndpoint,
     testAcceptFriendRequest,
+    testOptionsEndpoint,
     isLoading,
     isAuthenticated: !!user,
   }

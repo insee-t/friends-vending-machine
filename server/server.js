@@ -797,14 +797,56 @@ app.post('/api/test-friend', (req, res) => {
   });
 });
 
-// Handle preflight requests for friend endpoints
-app.options('/api/friends/*', (req, res) => {
-  console.log('Friend endpoint preflight request from:', req.headers.origin);
+// Test OPTIONS endpoint specifically
+app.options('/api/test-options', (req, res) => {
+  console.log('Test OPTIONS request from:', req.headers.origin);
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
   res.sendStatus(200);
+});
+
+app.get('/api/test-options', (req, res) => {
+  console.log('Test OPTIONS GET request from:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.json({ 
+    success: true, 
+    message: 'OPTIONS test successful',
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Handle preflight requests for friend endpoints
+app.options('/api/friends/*', (req, res) => {
+  try {
+    console.log('Friend endpoint preflight request from:', req.headers.origin);
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Error in friend OPTIONS handler:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// Specific OPTIONS handler for accept-request endpoint
+app.options('/api/friends/accept-request', (req, res) => {
+  try {
+    console.log('Accept friend request preflight from:', req.headers.origin);
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Error in OPTIONS handler:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 // Friend system routes

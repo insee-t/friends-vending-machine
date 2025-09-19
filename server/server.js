@@ -141,6 +141,34 @@ io.on('connection', (socket) => {
       io.emit('users-updated', { users: userList });
     }
   });
+
+  // Handle answer submission
+  socket.on('submit-answer', (data) => {
+    const { pairId, userId, answer } = data;
+    const pair = pairs.get(pairId);
+    
+    if (pair) {
+      console.log(`Answer submitted by ${userId} for pair ${pairId}: ${answer}`);
+      
+      // Find the partner's socket ID
+      const partnerId = pair.user1.id === userId ? pair.user2.id : pair.user1.id;
+      const partnerSocket = Array.from(io.sockets.sockets.values())
+        .find(s => s.id === partnerId);
+      
+      if (partnerSocket) {
+        // Send the answer to the partner
+        partnerSocket.emit('receive-answer', {
+          userId: userId,
+          answer: answer
+        });
+        console.log(`Answer sent to partner ${partnerId}`);
+      } else {
+        console.log(`Partner ${partnerId} not found`);
+      }
+    } else {
+      console.log(`Pair ${pairId} not found`);
+    }
+  });
 });
 
 // Function to check for pairing

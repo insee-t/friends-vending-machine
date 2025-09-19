@@ -76,14 +76,7 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Handle preflight requests
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
-});
+// Wildcard OPTIONS handler moved to end of file to avoid conflicts
 
 // Add headers for Next.js compatibility
 app.use((req, res, next) => {
@@ -1135,6 +1128,21 @@ process.on('SIGINT', () => {
     console.log('✅ Server closed');
     process.exit(0);
   });
+});
+
+// Wildcard OPTIONS handler - must be last to avoid conflicts with specific handlers
+app.options('*', (req, res) => {
+  try {
+    console.log('Wildcard OPTIONS request for:', req.path, 'from:', req.headers.origin);
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Error in wildcard OPTIONS handler:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 startServer();

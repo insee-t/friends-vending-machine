@@ -2,13 +2,26 @@
 
 import { useState } from 'react'
 import VPSServerPairingGame from './components/VPSServerPairingGame'
+import { LoginModal } from './components/LoginModal'
+import { UserProfile } from './components/UserProfile'
+import { useAuth } from './contexts/AuthContext'
 
 export default function Home() {
   const [isHovered, setIsHovered] = useState(false)
   const [showGame, setShowGame] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const { isAuthenticated, isLoading } = useAuth()
 
   if (showGame) {
     return <VPSServerPairingGame />
+  }
+
+  if (isLoading) {
+    return (
+      <div className="landing-container flex items-center justify-center min-h-screen">
+        <div className="text-white text-xl">กำลังโหลด...</div>
+      </div>
+    )
   }
 
   return (
@@ -19,6 +32,20 @@ export default function Home() {
       <div className="floating-circle"></div>
       <div className="floating-circle"></div>
       <div className="floating-circle"></div>
+
+      {/* Top right corner - User profile or login button */}
+      <div className="absolute top-4 right-4 z-20">
+        {isAuthenticated ? (
+          <UserProfile />
+        ) : (
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-full text-white font-medium hover:bg-opacity-30 transition-all"
+          >
+            เข้าสู่ระบบ
+          </button>
+        )}
+      </div>
 
       {/* Main content */}
       <div className="relative z-10 w-full max-w-4xl">
@@ -115,8 +142,22 @@ export default function Home() {
           <p className="text-white text-sm md:text-base opacity-90">
             โครงการเพื่อส่งเสริมความสัมพันธ์ในคณะวิศวกรรมคอมพิวเตอร์ มหาวิทยาลัยขอนแก่น
           </p>
+          {!isAuthenticated && (
+            <p className="text-white text-xs opacity-70 mt-2">
+              เข้าสู่ระบบเพื่อบันทึกประวัติการเล่นและพบเพื่อน
+            </p>
+          )}
         </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={() => {
+          // Optional: Show success message or redirect
+        }}
+      />
     </div>
   )
 }

@@ -604,7 +604,7 @@ function ActivityScreen({
           
           // Test if server is reachable first
           try {
-            const healthResponse = await fetch('/api/health');
+            const healthResponse = await fetch('https://api.ionize13.com/api/health');
             console.log('Server health check:', healthResponse.status);
           } catch (healthError) {
             console.error('Server not reachable:', healthError);

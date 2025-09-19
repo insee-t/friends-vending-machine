@@ -31,8 +31,11 @@ export async function POST(request: NextRequest) {
     const filepath = join(uploadsDir, filename)
     await writeFile(filepath, buffer)
 
-    // Return file URL
-    const fileUrl = `/uploads/${filename}`
+    // Return file URL - use full URL for production
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://ionize13.com' 
+      : 'http://localhost:3000'
+    const fileUrl = `${baseUrl}/uploads/${filename}`
     
     console.log('File uploaded successfully:', {
       filename: filename,

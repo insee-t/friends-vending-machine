@@ -907,8 +907,7 @@ function ActivityScreen({
               accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
               className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-white bg-opacity-50 text-black focus:border-green-400 focus:outline-none focus:ring-4 focus:ring-green-100 transition-all duration-300"
               disabled={isActivitySubmitted}
-              // Safari-specific attributes
-              capture="environment"
+              // Safari compatibility - removed capture attribute to prevent camera opening
               multiple={false}
             />
             {userFileUrl && (

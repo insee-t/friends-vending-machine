@@ -36,17 +36,31 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Allow your production domain
-    if (origin === 'https://ionize13.com' || origin === 'https://www.ionize13.com') {
+    // Allow your production domains
+    const allowedOrigins = [
+      'https://ionize13.com',
+      'https://www.ionize13.com',
+      'https://friends-vending-machine.vercel.app', // Add your Vercel domain if using it
+      'https://friends-vending-machine.netlify.app'  // Add your Netlify domain if using it
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     
-    // Allow all origins for development (you can restrict this in production)
+    // For production, be more restrictive
+    if (process.env.APP_ENV === 'production') {
+      console.log('CORS blocked origin:', origin);
+      return callback(new Error('Not allowed by CORS'), false);
+    }
+    
+    // Allow all origins for development
     return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
 app.use(express.json());
 
@@ -453,20 +467,41 @@ app.get('/api/users', (req, res) => {
   res.json({ users: userList });
 });
 
+// Handle preflight requests for file upload
+app.options('/api/upload', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.sendStatus(200);
+});
+
 // File upload endpoint
 app.post('/api/upload', upload.single('file'), (req, res) => {
   try {
+    // Set CORS headers for Safari compatibility
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    // Use HTTPS in production, HTTP in development
+    const protocol = process.env.APP_ENV === 'production' ? 'https' : req.protocol;
+    const host = process.env.APP_ENV === 'production' ? 'api.ionize13.com' : req.get('host');
+    const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+    
     console.log('File uploaded successfully:', {
       filename: req.file.filename,
       originalName: req.file.originalname,
       size: req.file.size,
-      fileUrl: fileUrl
+      fileUrl: fileUrl,
+      userAgent: req.headers['user-agent']
     });
+    
     res.json({ success: true, fileUrl });
   } catch (error) {
     console.error('File upload error:', error);

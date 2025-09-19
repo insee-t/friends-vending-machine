@@ -600,13 +600,27 @@ function ActivityScreen({
       console.log('File details:', {
         name: file.name,
         type: file.type,
-        size: file.size
+        size: file.size,
+        lastModified: file.lastModified
       });
+      
+      // Safari compatibility check
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        alert('ไฟล์มีขนาดใหญ่เกินไป (จำกัดที่ 10MB)');
+        return;
+      }
+      
       setUserFile(file);
       // Create preview URL
-      const url = URL.createObjectURL(file);
-      setUserFileUrl(url);
-      console.log('File preview URL created:', url);
+      try {
+        const url = URL.createObjectURL(file);
+        setUserFileUrl(url);
+        console.log('File preview URL created:', url);
+      } catch (error) {
+        console.error('Error creating file preview URL:', error);
+        // Fallback for Safari
+        setUserFileUrl(null);
+      }
     } else {
       console.log('No file selected');
       setUserFile(null);
@@ -637,9 +651,20 @@ function ActivityScreen({
             console.error('Server not reachable:', healthError);
           }
           
-          const response = await fetch('/api/upload', {
+          // Use the correct API base URL for file upload
+          const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
+            ? 'https://api.ionize13.com'
+            : 'http://localhost:3000'
+          
+          const response = await fetch(`${API_BASE}/api/upload`, {
             method: 'POST',
             body: formData,
+            // Safari-specific headers
+            headers: {
+              'Accept': 'application/json',
+            },
+            // Safari requires credentials for CORS
+            credentials: 'include',
           });
           
           console.log('File upload response status:', response.status);
@@ -651,6 +676,8 @@ function ActivityScreen({
           } else {
             const errorText = await response.text();
             console.error('File upload failed with status:', response.status, errorText);
+            // Don't throw error, just continue without file
+            console.warn('Continuing without file upload due to error');
           }
         } catch (error) {
           console.error('File upload failed:', error);
@@ -880,6 +907,9 @@ function ActivityScreen({
               accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
               className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-white bg-opacity-50 text-black focus:border-green-400 focus:outline-none focus:ring-4 focus:ring-green-100 transition-all duration-300"
               disabled={isActivitySubmitted}
+              // Safari-specific attributes
+              capture="environment"
+              multiple={false}
             />
             {userFileUrl && (
               <div className="mt-3">

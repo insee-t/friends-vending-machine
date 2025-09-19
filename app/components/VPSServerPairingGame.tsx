@@ -536,7 +536,10 @@ function ActivityScreen({
         console.log('Activity answer is from partner, setting partner activity answer:', data.answer);
         setPartnerActivityAnswer(data.answer);
         if (data.fileUrl) {
+          console.log('Setting partner file URL:', data.fileUrl);
           setPartnerFileUrl(data.fileUrl);
+        } else {
+          console.log('No file URL in partner data');
         }
       }
     };
@@ -607,12 +610,14 @@ function ActivityScreen({
       };
       
       console.log('Submitting activity answer:', submitData);
+      console.log('File URL being sent:', fileUrl);
       socketRef.current.emit('submit-activity-answer', submitData);
       setIsActivitySubmitted(true);
     }
   };
 
   console.log(partnerAnswer)
+  console.log('Partner file URL state:', partnerFileUrl)
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
@@ -883,7 +888,7 @@ function ActivityScreen({
                     {partnerFileUrl && (
                       <div className="mt-3">
                         {partnerFileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                          <img src={partnerFileUrl} alt="Partner's file" className="max-w-xs rounded-lg" />
+                          <img src={partnerFileUrl} alt="Partner's file" className="max-w-xs rounded-lg" onError={(e) => console.error('Image failed to load:', partnerFileUrl, e)} />
                         ) : (
                           <a href={partnerFileUrl} target="_blank" rel="noopener noreferrer" className="text-yellow-600 underline">
                             📎 ดูไฟล์ที่แนบ

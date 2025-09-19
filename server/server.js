@@ -335,6 +335,7 @@ io.on('connection', (socket) => {
     
     if (pair) {
       console.log(`Activity answer submitted by ${userId} for pair ${pairId}: ${answer}`);
+      console.log(`File URL in activity answer:`, fileUrl);
       
       // Find the partner's socket ID
       const partnerId = pair.user1.id === userId ? pair.user2.id : pair.user1.id;
@@ -343,11 +344,13 @@ io.on('connection', (socket) => {
       
       if (partnerSocket) {
         // Send the answer to the partner
-        partnerSocket.emit('receive-activity-answer', {
+        const dataToSend = {
           userId: userId,
           answer: answer,
           fileUrl: fileUrl
-        });
+        };
+        console.log(`Sending activity answer to partner ${partnerId}:`, dataToSend);
+        partnerSocket.emit('receive-activity-answer', dataToSend);
         console.log(`Activity answer sent to partner ${partnerId}`);
       } else {
         console.log(`Partner ${partnerId} not found`);
@@ -455,6 +458,12 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
   }
 
   const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  console.log('File uploaded successfully:', {
+    filename: req.file.filename,
+    originalName: req.file.originalname,
+    size: req.file.size,
+    fileUrl: fileUrl
+  });
   res.json({ success: true, fileUrl });
 });
 

@@ -23,3 +23,5 @@ echo ""
 echo "🚀 To start the server with new environment:"
 echo "   cd /var/www/friends-vending/server"
 echo "   pm2 restart friends-vending"
+
+

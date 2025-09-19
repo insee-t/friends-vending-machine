@@ -600,7 +600,16 @@ function ActivityScreen({
           formData.append('pairId', pair.id);
           formData.append('userId', currentUser.id);
           
-          console.log('Sending file upload request...');
+          console.log('Sending file upload request to:', '/api/upload');
+          
+          // Test if server is reachable first
+          try {
+            const healthResponse = await fetch('/api/health');
+            console.log('Server health check:', healthResponse.status);
+          } catch (healthError) {
+            console.error('Server not reachable:', healthError);
+          }
+          
           const response = await fetch('/api/upload', {
             method: 'POST',
             body: formData,

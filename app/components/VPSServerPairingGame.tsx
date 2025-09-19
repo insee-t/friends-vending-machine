@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { useAuth } from '../contexts/AuthContext'
+import 'dotenv/config'
 
 interface User {
   id: string

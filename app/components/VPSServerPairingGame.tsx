@@ -626,6 +626,7 @@ function ActivityScreen({
             const result = await response.json();
             console.log('File upload result:', result);
             fileUrl = result.fileUrl;
+            console.log('File URL set to:', fileUrl);
           } else {
             const errorText = await response.text();
             console.error('File upload failed with status:', response.status, errorText);

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 export const UserProfile: React.FC = () => {
-  const { user, logout, updateSocialMediaHandle, getFriends, getFriendRequests, acceptFriendRequest, rejectFriendRequest } = useAuth()
+  const { user, logout, updateSocialMediaHandle, getFriends, getFriendRequests, acceptFriendRequest, rejectFriendRequest, testFriendEndpoint } = useAuth()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isEditingSocialHandle, setIsEditingSocialHandle] = useState(false)
   const [socialHandleInput, setSocialHandleInput] = useState('')
@@ -249,6 +249,21 @@ export const UserProfile: React.FC = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Debug Test Button */}
+              <div className="px-3 py-2 border-t border-gray-100">
+                <button
+                  onClick={async () => {
+                    console.log('Testing friend endpoint...');
+                    const result = await testFriendEndpoint();
+                    console.log('Test result:', result);
+                    alert(result ? 'Test successful!' : 'Test failed!');
+                  }}
+                  className="w-full text-left px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm"
+                >
+                  🧪 Test Friend Endpoint
+                </button>
               </div>
               
               <button

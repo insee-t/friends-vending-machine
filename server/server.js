@@ -45,6 +45,7 @@ app.use(cors({
     
     // Allow your production domains
     const allowedOrigins = [
+      'https://api.ionize13.com',
       'https://ionize13.com',
       'https://www.ionize13.com',
       'https://friends-vending-machine.vercel.app',
@@ -433,17 +434,24 @@ function checkForPairing() {
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
+  console.log('Authentication middleware called for:', req.path);
+  console.log('Authorization header:', req.headers['authorization']);
+  
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
+    console.log('No token provided');
     return res.status(401).json({ success: false, message: 'Access token required' });
   }
 
+  console.log('Token found, verifying...');
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      console.log('Token verification failed:', err.message);
       return res.status(403).json({ success: false, message: 'Invalid token' });
     }
+    console.log('Token verified successfully for user:', user);
     req.user = user;
     next();
   });
@@ -763,6 +771,32 @@ app.get('/api/test-cors', (req, res) => {
   });
 });
 
+// Test friend endpoint without authentication
+app.options('/api/test-friend', (req, res) => {
+  console.log('Test friend preflight request from:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.sendStatus(200);
+});
+
+app.post('/api/test-friend', (req, res) => {
+  console.log('Test friend request received from:', req.headers.origin);
+  console.log('Request body:', req.body);
+  console.log('Authorization header:', req.headers['authorization']);
+  
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.json({ 
+    success: true, 
+    message: 'Friend test successful',
+    origin: req.headers.origin,
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Handle preflight requests for friend endpoints
 app.options('/api/friends/*', (req, res) => {
   console.log('Friend endpoint preflight request from:', req.headers.origin);
@@ -840,6 +874,10 @@ app.post('/api/friends/send-request', authenticateToken, async (req, res) => {
 
 app.post('/api/friends/accept-request', authenticateToken, async (req, res) => {
   try {
+    console.log('Accept friend request received from:', req.headers.origin);
+    console.log('Request body:', req.body);
+    console.log('User:', req.user);
+    
     // Set CORS headers
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
     res.header('Access-Control-Allow-Credentials', 'true');

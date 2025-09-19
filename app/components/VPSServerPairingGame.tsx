@@ -528,6 +528,10 @@ function ActivityScreen({
 
     const handleReceiveActivityAnswer = (data: { userId: string; answer: string; fileUrl?: string }) => {
       console.log('Received activity answer data:', data);
+      console.log('Current user ID:', currentUser?.id);
+      console.log('Pair user1 ID:', pair.user1.id);
+      console.log('Pair user2 ID:', pair.user2.id);
+      console.log('Data user ID:', data.userId);
       
       if (
         (pair.user1.id === data.userId && pair.user2.id === currentUser?.id) ||
@@ -541,6 +545,8 @@ function ActivityScreen({
         } else {
           console.log('No file URL in partner data');
         }
+      } else {
+        console.log('Activity answer is not from partner, ignoring');
       }
     };
 
@@ -640,6 +646,9 @@ function ActivityScreen({
       
       console.log('Submitting activity answer:', submitData);
       console.log('File URL being sent:', fileUrl);
+      console.log('Socket connected:', socketRef.current?.connected);
+      console.log('Current user ID:', currentUser.id);
+      console.log('Pair ID:', pair.id);
       socketRef.current.emit('submit-activity-answer', submitData);
       setIsActivitySubmitted(true);
     }

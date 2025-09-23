@@ -38,9 +38,6 @@ interface AuthContextType {
   getFriends: () => Promise<Friend[]>
   getFriendRequests: () => Promise<FriendRequest[]>
   getSentFriendRequests: () => Promise<FriendRequest[]>
-  testFriendEndpoint: () => Promise<boolean>
-  testAcceptFriendRequest: () => Promise<boolean>
-  testOptionsEndpoint: () => Promise<boolean>
   isLoading: boolean
   isAuthenticated: boolean
 }
@@ -394,91 +391,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
-  // Test function for debugging
-  const testFriendEndpoint = async (): Promise<boolean> => {
-    try {
-      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
-        ? 'https://api.ionize13.com'
-        : 'http://localhost:3000'
-      
-      const token = localStorage.getItem('authToken')
-      console.log('Testing friend endpoint with token:', token ? 'present' : 'missing')
-
-      const response = await fetch(`${API_BASE}/api/test-friend`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ test: 'data' }),
-        credentials: 'include'
-      })
-
-      const data = await response.json()
-      console.log('Test friend endpoint response:', data)
-      return data.success
-    } catch (error) {
-      console.error('Test friend endpoint error:', error)
-      return false
-    }
-  }
-
-  // Test accept friend request specifically
-  const testAcceptFriendRequest = async (): Promise<boolean> => {
-    try {
-      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
-        ? 'https://api.ionize13.com'
-        : 'http://localhost:3000'
-      
-      const token = localStorage.getItem('authToken')
-      console.log('Testing accept friend request with token:', token ? 'present' : 'missing')
-
-      const response = await fetch(`${API_BASE}/api/friends/accept-request`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ friendId: 'test-friend-id' }),
-        credentials: 'include'
-      })
-
-      const data = await response.json()
-      console.log('Accept friend request test response:', data)
-      console.log('Response status:', response.status)
-      return response.ok
-    } catch (error) {
-      console.error('Accept friend request test error:', error)
-      return false
-    }
-  }
-
-  // Test OPTIONS endpoint specifically
-  const testOptionsEndpoint = async (): Promise<boolean> => {
-    try {
-      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
-        ? 'https://api.ionize13.com'
-        : 'http://localhost:3000'
-      
-      console.log('Testing OPTIONS endpoint...')
-
-      const response = await fetch(`${API_BASE}/api/test-options`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      })
-
-      const data = await response.json()
-      console.log('OPTIONS test response:', data)
-      console.log('Response status:', response.status)
-      return response.ok
-    } catch (error) {
-      console.error('OPTIONS test error:', error)
-      return false
-    }
-  }
 
   const value: AuthContextType = {
     user,
@@ -493,9 +405,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     getFriends,
     getFriendRequests,
     getSentFriendRequests,
-    testFriendEndpoint,
-    testAcceptFriendRequest,
-    testOptionsEndpoint,
     isLoading,
     isAuthenticated: !!user,
   }

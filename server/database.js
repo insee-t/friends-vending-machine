@@ -251,20 +251,60 @@ class Database {
       const { v4: uuidv4 } = require('uuid');
       const requestId = uuidv4();
       
-      const sql = `
-        INSERT INTO friends (id, user_id, friend_id, status)
-        VALUES (?, ?, ?, 'pending')
+      // First, check if there's already a pending request from the friend
+      const checkExistingSql = `
+        SELECT id FROM friends 
+        WHERE user_id = ? AND friend_id = ? AND status = 'pending'
       `;
       
-      this.db.run(sql, [requestId, userId, friendId], function(err) {
-        if (err) {
-          if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-            reject(new Error('Friend request already exists'));
-          } else {
-            reject(err);
-          }
+      this.db.get(checkExistingSql, [friendId, userId], (checkErr, existingRequest) => {
+        if (checkErr) {
+          reject(checkErr);
+        } else if (existingRequest) {
+          // There's already a pending request from the friend, automatically accept both
+          const updateExistingSql = `
+            UPDATE friends 
+            SET status = 'accepted', updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?
+          `;
+          
+          this.db.run(updateExistingSql, [existingRequest.id], (updateErr) => {
+            if (updateErr) {
+              reject(updateErr);
+            } else {
+              // Create the reciprocal friendship
+              const insertReciprocalSql = `
+                INSERT INTO friends (id, user_id, friend_id, status)
+                VALUES (?, ?, ?, 'accepted')
+              `;
+              
+              this.db.run(insertReciprocalSql, [requestId, userId, friendId], (insertErr) => {
+                if (insertErr) {
+                  reject(insertErr);
+                } else {
+                  resolve({ id: requestId, status: 'accepted', autoAccepted: true });
+                }
+              });
+            }
+          });
         } else {
-          resolve({ id: requestId, status: 'pending' });
+          // No existing request, create a new pending request
+          const insertSql = `
+            INSERT INTO friends (id, user_id, friend_id, status)
+            VALUES (?, ?, ?, 'pending')
+          `;
+          
+          this.db.run(insertSql, [requestId, userId, friendId], function(err) {
+            if (err) {
+              if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+                reject(new Error('Friend request already exists'));
+              } else {
+                reject(err);
+              }
+            } else {
+              resolve({ id: requestId, status: 'pending' });
+            }
+          });
         }
       });
     });
@@ -289,30 +329,57 @@ class Database {
         } else if (this.changes === 0) {
           reject(new Error('No pending friend request found'));
         } else {
-          // Check if reciprocal friendship already exists
-          const checkSql = `
+          // Check if there's a pending request in the opposite direction
+          const checkPendingSql = `
             SELECT id FROM friends 
-            WHERE user_id = ? AND friend_id = ? AND status = 'accepted'
+            WHERE user_id = ? AND friend_id = ? AND status = 'pending'
           `;
           
-          db.get(checkSql, [userId, friendId], function(checkErr, row) {
-            if (checkErr) {
-              reject(checkErr);
-            } else if (row) {
-              // Reciprocal friendship already exists, just resolve
-              resolve({ id: row.id, status: 'accepted' });
-            } else {
-              // Create the reciprocal friendship
-              const insertSql = `
-                INSERT INTO friends (id, user_id, friend_id, status)
-                VALUES (?, ?, ?, 'accepted')
+          db.get(checkPendingSql, [userId, friendId], function(checkPendingErr, pendingRow) {
+            if (checkPendingErr) {
+              reject(checkPendingErr);
+            } else if (pendingRow) {
+              // There's a pending request in the opposite direction, update it to accepted
+              const updatePendingSql = `
+                UPDATE friends 
+                SET status = 'accepted', updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
               `;
               
-              db.run(insertSql, [requestId, userId, friendId], function(insertErr) {
-                if (insertErr) {
-                  reject(insertErr);
+              db.run(updatePendingSql, [pendingRow.id], function(updatePendingErr) {
+                if (updatePendingErr) {
+                  reject(updatePendingErr);
                 } else {
-                  resolve({ id: requestId, status: 'accepted' });
+                  resolve({ id: pendingRow.id, status: 'accepted' });
+                }
+              });
+            } else {
+              // Check if reciprocal friendship already exists
+              const checkAcceptedSql = `
+                SELECT id FROM friends 
+                WHERE user_id = ? AND friend_id = ? AND status = 'accepted'
+              `;
+              
+              db.get(checkAcceptedSql, [userId, friendId], function(checkAcceptedErr, acceptedRow) {
+                if (checkAcceptedErr) {
+                  reject(checkAcceptedErr);
+                } else if (acceptedRow) {
+                  // Reciprocal friendship already exists, just resolve
+                  resolve({ id: acceptedRow.id, status: 'accepted' });
+                } else {
+                  // Create the reciprocal friendship
+                  const insertSql = `
+                    INSERT INTO friends (id, user_id, friend_id, status)
+                    VALUES (?, ?, ?, 'accepted')
+                  `;
+                  
+                  db.run(insertSql, [requestId, userId, friendId], function(insertErr) {
+                    if (insertErr) {
+                      reject(insertErr);
+                    } else {
+                      resolve({ id: requestId, status: 'accepted' });
+                    }
+                  });
                 }
               });
             }

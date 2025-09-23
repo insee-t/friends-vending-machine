@@ -39,7 +39,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
           setIsLoading(false)
           return
         }
-        success = await signup(email, password, nickname.trim(), socialMediaHandle.trim() || undefined)
+        const socialMediaHandleValue = socialMediaHandle.trim() || undefined
+        //console.log('LoginModal signup call:', { email, password, nickname: nickname.trim(), socialMediaHandle: socialMediaHandleValue })
+        success = await signup(email, password, nickname.trim(), socialMediaHandleValue)
         if (!success) {
           setError('อีเมลนี้มีผู้ใช้แล้ว หรือข้อมูลไม่ถูกต้อง')
         }

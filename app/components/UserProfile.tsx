@@ -55,14 +55,14 @@ export const UserProfile: React.FC = () => {
   const handleAcceptFriendRequest = async (friendId: string) => {
     const success = await acceptFriendRequest(friendId)
     if (success) {
-      loadFriends() // Reload friends list
+      setTimeout(() => loadFriends(), 300) // Reload friends list with delay
     }
   }
 
   const handleRejectFriendRequest = async (friendId: string) => {
     const success = await rejectFriendRequest(friendId)
     if (success) {
-      loadFriends() // Reload friends list
+      setTimeout(() => loadFriends(), 300) // Reload friends list with delay
     }
   }
 

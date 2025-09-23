@@ -118,7 +118,7 @@ class Database {
 
       this.db.run(sql, [id, email, nickname, hashedPassword, socialMediaHandle || null], function(err) {
         if (err) {
-          if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+          if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'SQLITE_CONSTRAINT') {
             reject(new Error('User already exists'));
           } else {
             reject(err);
@@ -282,23 +282,39 @@ class Database {
         WHERE user_id = ? AND friend_id = ? AND status = 'pending'
       `;
       
+      const db = this.db;
       this.db.run(updateSql, [friendId, userId], function(err) {
         if (err) {
           reject(err);
         } else if (this.changes === 0) {
           reject(new Error('No pending friend request found'));
         } else {
-          // Create the reciprocal friendship
-          const insertSql = `
-            INSERT INTO friends (id, user_id, friend_id, status)
-            VALUES (?, ?, ?, 'accepted')
+          // Check if reciprocal friendship already exists
+          const checkSql = `
+            SELECT id FROM friends 
+            WHERE user_id = ? AND friend_id = ? AND status = 'accepted'
           `;
           
-          this.db.run(insertSql, [requestId, userId, friendId], function(insertErr) {
-            if (insertErr) {
-              reject(insertErr);
+          db.get(checkSql, [userId, friendId], function(checkErr, row) {
+            if (checkErr) {
+              reject(checkErr);
+            } else if (row) {
+              // Reciprocal friendship already exists, just resolve
+              resolve({ id: row.id, status: 'accepted' });
             } else {
-              resolve({ id: requestId, status: 'accepted' });
+              // Create the reciprocal friendship
+              const insertSql = `
+                INSERT INTO friends (id, user_id, friend_id, status)
+                VALUES (?, ?, ?, 'accepted')
+              `;
+              
+              db.run(insertSql, [requestId, userId, friendId], function(insertErr) {
+                if (insertErr) {
+                  reject(insertErr);
+                } else {
+                  resolve({ id: requestId, status: 'accepted' });
+                }
+              });
             }
           });
         }

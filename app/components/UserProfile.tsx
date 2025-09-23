@@ -27,7 +27,7 @@ export const UserProfile: React.FC = () => {
   }
 
   const handleEditSocialHandle = () => {
-    setSocialHandleInput(user.socialMediaHandle || '')
+    setSocialHandleInput(user?.socialMediaHandle || '')
     setIsEditingSocialHandle(true)
   }
 

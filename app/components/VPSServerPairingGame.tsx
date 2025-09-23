@@ -4,13 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { useAuth } from '../contexts/AuthContext'
 
-
-
 interface User {
   id: string
-  userId?: string | null
   nickname: string
-  socialMediaHandle?: string
+  socialMediaHandle?: string | null
   joinedAt: number
   status: 'waiting' | 'paired'
   socketId: string
@@ -44,8 +41,8 @@ export default function VPSServerPairingGame() {
   // Auto-login with authenticated user's nickname
   useEffect(() => {
     if (isAuthenticated && authUser && connectionStatus === 'connected' && gamePhase === 'nickname' && !userManuallyLeft) {
-      // Automatically use the logged-in user's nickname
-      handleNicknameSubmit(authUser.nickname)
+      // Automatically use the logged-in user's nickname and social media handle
+      handleNicknameSubmit(authUser.nickname, authUser.socialMediaHandle)
     }
   }, [isAuthenticated, authUser, connectionStatus, gamePhase, userManuallyLeft])
 
@@ -104,21 +101,25 @@ export default function VPSServerPairingGame() {
     }
   }, [gamePhase])
 
-  const handleNicknameSubmit = (nickname: string) => {
-    if (socketRef.current && socketRef.current.id) {
-      const socialMediaHandle = authUser?.socialMediaHandle || null
-      const userId = authUser?.id || null
-      socketRef.current.emit('join-waiting', { nickname, socialMediaHandle, userId })
-      setCurrentUser({
+  const handleNicknameSubmit = (nickname: string, socialMediaHandle?: string) => {
+    if (socketRef.current && nickname.trim() && socketRef.current.id) {
+      const user = {
         id: socketRef.current.id,
-        nickname,
-        socialMediaHandle: socialMediaHandle || undefined,
+        nickname: nickname.trim(),
+        socialMediaHandle: socialMediaHandle || null,
         joinedAt: Date.now(),
-        status: 'waiting',
+        status: 'waiting' as const,
         socketId: socketRef.current.id
-      })
+      }
+      
+      setCurrentUser(user)
       setGamePhase('waiting')
-      setUserManuallyLeft(false) // Reset the flag when user starts a new game
+      
+      // Send user data to server
+      socketRef.current.emit('join-waiting', {
+        nickname: nickname.trim(),
+        socialMediaHandle: socialMediaHandle || null
+      })
     }
   }
 
@@ -177,12 +178,12 @@ export default function VPSServerPairingGame() {
         {/* Game Content */}
         {gamePhase === 'nickname' && (
           <NicknameInput 
-            onSubmit={handleNicknameSubmit} 
+            onSubmit={handleNicknameSubmit}
             isAuthenticated={isAuthenticated}
             authUser={authUser}
             userManuallyLeft={userManuallyLeft}
             onBackToHome={() => {
-              setUserManuallyLeft(false)
+
               // This will trigger the parent component to go back to home
               window.location.href = '/'
             }}
@@ -227,19 +228,20 @@ function NicknameInput({
   userManuallyLeft,
   onBackToHome
 }: { 
-  onSubmit: (nickname: string) => void
+  onSubmit: (nickname: string, socialMediaHandle?: string) => void
   isAuthenticated: boolean
   authUser: any
   userManuallyLeft: boolean
   onBackToHome: () => void
 }) {
   const [nickname, setNickname] = useState('')
+  const [socialMediaHandle, setSocialMediaHandle] = useState('')
   const [useCustomName, setUseCustomName] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (nickname.trim()) {
-      onSubmit(nickname.trim())
+      onSubmit(nickname.trim(), socialMediaHandle.trim() || undefined)
     }
   }
 
@@ -272,6 +274,9 @@ function NicknameInput({
               </div>
               <div>
                 <p className="font-semibold text-blue-900">{authUser?.nickname}</p>
+                {authUser?.socialMediaHandle && (
+                  <p className="text-sm text-blue-700">📱 {authUser.socialMediaHandle}</p>
+                )}
                 <p className="text-sm text-blue-700">กำลังเข้าสู่เกม...</p>
               </div>
             </div>
@@ -303,6 +308,20 @@ function NicknameInput({
               maxLength={20}
               required
             />
+          </div>
+
+          <div>
+            <input
+              type="text"
+              value={socialMediaHandle}
+              onChange={(e) => setSocialMediaHandle(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-black placeholder-black placeholder-opacity-60 focus:border-opacity-60 focus:outline-none text-center text-lg"
+              placeholder="IG / Facebook (ไม่บังคับ)"
+              maxLength={100}
+            />
+            <p className="text-xs text-black opacity-60 mt-1 text-center">
+              เช่น @username หรือ username
+            </p>
           </div>
 
           <button
@@ -343,97 +362,91 @@ function NicknameInput({
 function WaitingRoom({ 
   currentUser, 
   allUsers, 
-  waitingMessage,
-  onLeave,
-  connectionStatus
-}: { 
+  waitingMessage, 
+  onLeave, 
+  connectionStatus 
+}: {
   currentUser: User | null
   allUsers: User[]
   waitingMessage: string
   onLeave: () => void
-  connectionStatus: 'connecting' | 'connected' | 'disconnected'
+  connectionStatus: string
 }) {
-  const waitingUsers = allUsers.filter(user => user.status === 'waiting')
-  const otherWaitingUsers = waitingUsers.filter(user => user.id !== currentUser?.id)
-  
+  const otherWaitingUsers = allUsers.filter(user => user.id !== currentUser?.id)
+
   return (
     <div className="bg-white backdrop-blur-lg rounded-2xl p-8 max-w-2xl mx-auto">
-      <div className="text-center">
-        <div className="text-6xl mb-6">⏳</div>
-        <h2 className="text-2xl font-bold text-black mb-4">
-          กำลังสุ่มหาเพื่อนให้คุณ...
-        </h2>
-        <p className="text-lg text-black opacity-80 mb-6">
-          {waitingMessage}
-        </p>
+      <div className="text-center mb-6">
+        <div className="text-6xl mb-4">⏳</div>
+        <h2 className="text-2xl font-bold text-black mb-2">กำลังหาคู่ให้คุณ</h2>
+        <p className="text-black opacity-80">{waitingMessage}</p>
+      </div>
 
+      <div className="space-y-6">
         {/* Current User */}
-        <div className="bg-white bg-opacity-20 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-black text-lg">
-            คุณ: {currentUser?.nickname || 'กำลังเชื่อมต่อ...'}
-          </h3>
-          <p className="text-black opacity-80">
-            กำลังรอเพื่อนใหม่... ({waitingUsers.length} คนในห้องรอ)
-          </p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-center space-x-3">
+            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+              {currentUser?.nickname?.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="font-semibold text-blue-900">{currentUser?.nickname}</p>
+              {currentUser?.socialMediaHandle && (
+                <p className="text-sm text-blue-700">📱 {currentUser.socialMediaHandle}</p>
+              )}
+              <p className="text-sm text-blue-700">คุณ</p>
+            </div>
+          </div>
         </div>
 
-        {/* Other Users */}
+        {/* Other Waiting Users */}
         {otherWaitingUsers.length > 0 && (
-          <div className="space-y-3 mb-6">
-            <h3 className="text-black font-semibold">ผู้เข้าร่วมคนอื่น:</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-black mb-3 text-center">
+              คนอื่นๆ ที่กำลังรอ ({otherWaitingUsers.length} คน)
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {otherWaitingUsers.map(user => (
                 <div key={user.id} className="bg-white bg-opacity-20 rounded-lg p-3">
-                  <span className="text-black font-medium">
-                    {user.nickname}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                      {user.nickname.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="text-black font-medium">
+                        {user.nickname}
+                      </span>
+                      {user.socialMediaHandle && (
+                        <p className="text-xs text-gray-600">📱 {user.socialMediaHandle}</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Instructions */}
-        {/* <div className="bg-blue-400 bg-opacity-20 rounded-lg p-4 mb-6">
-          <p className="text-black text-sm">
-            💡 <strong>วิธีทดสอบ:</strong> เปิดเว็บไซต์นี้บนอุปกรณ์อื่นหรือให้เพื่อนเปิดเว็บไซต์เดียวกัน 
-            กรอกชื่อเล่นแล้วรอในห้องรอ จะมีการจับคู่อัตโนมัติ!
-          </p>
-        </div> */}
-
-        {/* Debug Info */}
-        {/* <div className="bg-gray-400 bg-opacity-20 rounded-lg p-4 mb-6">
-          <p className="text-gray-200 text-xs">
-            <strong>Debug:</strong> Total users: {allUsers.length}, Waiting: {waitingUsers.length}
-          </p>
-          <p className="text-gray-200 text-xs mt-1">
-            <strong>Users:</strong> {allUsers.map(u => `${u.nickname}(${u.status})`).join(', ')}
-          </p>
-          <p className="text-gray-200 text-xs mt-1">
-            <strong>Connection:</strong> {connectionStatus}
-          </p>
-        </div> */}
-
-        {/* Loading Animation */}
-        <div className="mt-8">
-          <div className="flex justify-center space-x-2">
-            <div className="w-3 h-3 bg-white rounded-full animate-bounce"></div>
-            <div className="w-3 h-3 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-            <div className="w-3 h-3 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+        {/* Connection Status */}
+        <div className="text-center">
+          <div className={`inline-block px-4 py-2 rounded-lg ${
+            connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
+            connectionStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+            'bg-red-100 text-red-800'
+          }`}>
+            {connectionStatus === 'connected' ? '🟢 เชื่อมต่อแล้ว' :
+             connectionStatus === 'connecting' ? '🟡 กำลังเชื่อมต่อ...' :
+             '🔴 เชื่อมต่อไม่ได้'}
           </div>
         </div>
 
         {/* Leave Button */}
-        <div className="mt-6">
+        <div className="text-center">
           <button
-            onClick={() => {
-              if (window.confirm('คุณแน่ใจหรือไม่ที่จะออกจากห้องรอ?')) {
-                onLeave()
-              }
-            }}
-            className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 shadow-lg"
+            onClick={onLeave}
+            className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors"
           >
-            🚪 ออกจากห้องรอ
+            ออกจากเกม
           </button>
         </div>
       </div>
@@ -445,735 +458,447 @@ function WaitingRoom({
 function PairingResult({ pair }: { pair: Pair }) {
   return (
     <div className="bg-white backdrop-blur-lg rounded-2xl p-8 max-w-2xl mx-auto">
-      <div className="text-center">
-        <div className="text-6xl mb-6">🎉</div>
-        <h2 className="text-2xl font-bold text-black mb-6">
-          พบเพื่อนใหม่แล้ว!
-        </h2>
+      <div className="text-center mb-6">
+        <div className="text-6xl mb-4">🎉</div>
+        <h2 className="text-2xl font-bold text-black mb-2">พบคู่แล้ว!</h2>
+        <p className="text-black opacity-80">คุณได้คู่แล้ว กำลังเตรียมความสนุกให้คุณ...</p>
+      </div>
 
-        <div className="space-y-6">
-          {/* Users */}
-          <div className="flex justify-center items-center space-x-4">
-            <div className="bg-white bg-opacity-20 rounded-lg p-4 text-center">
-              <div className="text-2xl mb-2">👤</div>
-              <h3 className="font-semibold text-black text-lg">
-                {pair.user1.nickname}
-              </h3>
-              {pair.user1.socialMediaHandle && (
-                <p className="text-sm text-gray-600 mt-1">
-                  📱 {pair.user1.socialMediaHandle}
-                </p>
-              )}
-            </div>
+      <div className="flex justify-center space-x-8">
+        <div className="bg-white bg-opacity-20 rounded-lg p-4 text-center">
+          <div className="text-2xl mb-2">👤</div>
+          <h3 className="font-semibold text-black text-lg">
+            {pair.user1.nickname}
+          </h3>
+          {pair.user1.socialMediaHandle && (
+            <p className="text-sm text-gray-600">📱 {pair.user1.socialMediaHandle}</p>
+          )}
+        </div>
 
-            <div className="text-4xl">🤗</div>
+        <div className="text-4xl self-center">🤝</div>
 
-            <div className="bg-white bg-opacity-20 rounded-lg p-4 text-center">
-              <div className="text-2xl mb-2">👤</div>
-              <h3 className="font-semibold text-black text-lg">
-                {pair.user2.nickname}
-              </h3>
-              {pair.user2.socialMediaHandle && (
-                <p className="text-sm text-gray-600 mt-1">
-                  📱 {pair.user2.socialMediaHandle}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-yellow-400 bg-opacity-20 rounded-lg p-4">
-            <p className="text-black text-lg">
-              กำลังเตรียมกิจกรรมสนุกๆ ให้คุณ...
-            </p>
-          </div>
+        <div className="bg-white bg-opacity-20 rounded-lg p-4 text-center">
+          <div className="text-2xl mb-2">👤</div>
+          <h3 className="font-semibold text-black text-lg">
+            {pair.user2.nickname}
+          </h3>
+          {pair.user2.socialMediaHandle && (
+            <p className="text-sm text-gray-600">📱 {pair.user2.socialMediaHandle}</p>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function ActivityScreen({
-  pair,
-  onNewGame,
-  onLeave,
-  currentUser,
-  socketRef,
-  isAuthenticated,
-  authUser
-}: {
-  pair: Pair;
-  onNewGame: () => void;
-  onLeave: () => void;
-  currentUser: User | null;
-  socketRef: React.MutableRefObject<Socket | null>;
-  isAuthenticated: boolean;
-  authUser: any;
-}) {
-  console.log('ActivityScreen props:', { pair, currentUser, socketRef });
-  const [showAnswer, setShowAnswer] = useState(false);
-  const [userAnswer, setUserAnswer] = useState('');
-  const [partnerAnswer, setPartnerAnswer] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false); // Track submission status
-  
-  // Activity form states
-  const [showActivityAnswer, setShowActivityAnswer] = useState(false);
-  const [userActivityAnswer, setUserActivityAnswer] = useState('');
-  const [partnerActivityAnswer, setPartnerActivityAnswer] = useState('');
-  const [isActivitySubmitted, setIsActivitySubmitted] = useState(false);
-  const [userFile, setUserFile] = useState<File | null>(null);
-  const [partnerFile, setPartnerFile] = useState<string | null>(null);
-  const [userFileUrl, setUserFileUrl] = useState<string | null>(null);
-  const [partnerFileUrl, setPartnerFileUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!socketRef.current) return;
-
-    const socket = socketRef.current;
-
-    const handleReceiveAnswer = (data: { userId: string; answer: string }) => {
-      console.log('Received answer data:', data);
-      console.log('Current pair:', pair);
-      console.log('Current user:', currentUser);
-      console.log('Checking if answer is from partner...');
-      
-      if (
-        (pair.user1.id === data.userId && pair.user2.id === currentUser?.id) ||
-        (pair.user2.id === data.userId && pair.user1.id === currentUser?.id)
-      ) {
-        console.log('Answer is from partner, setting partner answer:', data.answer);
-        setPartnerAnswer(data.answer);
-      } else {
-        console.log('Answer is not from partner, ignoring');
-      }
-    };
-
-    const handleReceiveActivityAnswer = (data: { userId: string; answer: string; fileUrl?: string }) => {
-      console.log('Received activity answer data:', data);
-      console.log('Current user ID:', currentUser?.id);
-      console.log('Pair user1 ID:', pair.user1.id);
-      console.log('Pair user2 ID:', pair.user2.id);
-      console.log('Data user ID:', data.userId);
-      
-      if (
-        (pair.user1.id === data.userId && pair.user2.id === currentUser?.id) ||
-        (pair.user2.id === data.userId && pair.user1.id === currentUser?.id)
-      ) {
-        console.log('Activity answer is from partner, setting partner activity answer:', data.answer);
-        setPartnerActivityAnswer(data.answer);
-        if (data.fileUrl) {
-          console.log('Setting partner file URL:', data.fileUrl);
-          setPartnerFileUrl(data.fileUrl);
-        } else {
-          console.log('No file URL in partner data');
-        }
-      } else {
-        console.log('Activity answer is not from partner, ignoring');
-      }
-    };
-
-    socket.on('receive-answer', handleReceiveAnswer);
-    socket.on('receive-activity-answer', handleReceiveActivityAnswer);
-
-    return () => {
-      socket.off('receive-answer', handleReceiveAnswer);
-      socket.off('receive-activity-answer', handleReceiveActivityAnswer);
-    };
-  }, [pair, currentUser, socketRef]);
-
-  const handleAnswerSubmit = () => {
-    if (socketRef.current && userAnswer.trim() && currentUser && !isSubmitted) {
-      const submitData = {
-        pairId: pair.id,
-        userId: currentUser.id,
-        answer: userAnswer.trim()
-      };
-      console.log('Submitting answer:', submitData);
-      socketRef.current.emit('submit-answer', submitData);
-      setIsSubmitted(true); // Mark as submitted
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    console.log('File selected:', file);
-    if (file) {
-      console.log('File details:', {
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        lastModified: file.lastModified
-      });
-      
-      // Safari compatibility check
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        alert('ไฟล์มีขนาดใหญ่เกินไป (จำกัดที่ 10MB)');
-        return;
-      }
-      
-      setUserFile(file);
-      // Create preview URL
-      try {
-        const url = URL.createObjectURL(file);
-        setUserFileUrl(url);
-        console.log('File preview URL created:', url);
-      } catch (error) {
-        console.error('Error creating file preview URL:', error);
-        // Fallback for Safari
-        setUserFileUrl(null);
-      }
-    } else {
-      console.log('No file selected');
-      setUserFile(null);
-      setUserFileUrl(null);
-    }
-  };
-
-  const handleActivitySubmit = async () => {
-    if (socketRef.current && userActivityAnswer.trim() && currentUser && !isActivitySubmitted) {
-      let fileUrl = null;
-      
-      // Upload file if selected
-      if (userFile) {
-        console.log('Uploading file:', userFile.name, userFile.type, userFile.size);
-        try {
-          const formData = new FormData();
-          formData.append('file', userFile);
-          formData.append('pairId', pair.id);
-          formData.append('userId', currentUser.id);
-          
-          console.log('Sending file upload request to:', '/api/upload');
-          
-          // Test if server is reachable first
-          try {
-            const healthResponse = await fetch('https://api.ionize13.com/api/health');
-            console.log('Server health check:', healthResponse.status);
-          } catch (healthError) {
-            console.error('Server not reachable:', healthError);
-          }
-          
-          // Use the correct API base URL for file upload
-          const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
-            ? 'https://api.ionize13.com'
-            : 'http://localhost:3000'
-          
-          const response = await fetch(`${API_BASE}/api/upload`, {
-            method: 'POST',
-            body: formData,
-            // Safari-specific headers
-            headers: {
-              'Accept': 'application/json',
-            },
-            // Safari requires credentials for CORS
-            credentials: 'include',
-          });
-          
-          console.log('File upload response status:', response.status);
-          if (response.ok) {
-            const result = await response.json();
-            console.log('File upload result:', result);
-            fileUrl = result.fileUrl;
-            console.log('File URL set to:', fileUrl);
-          } else {
-            const errorText = await response.text();
-            console.error('File upload failed with status:', response.status, errorText);
-            // Don't throw error, just continue without file
-            console.warn('Continuing without file upload due to error');
-          }
-        } catch (error) {
-          console.error('File upload failed:', error);
-        }
-      } else {
-        console.log('No file selected for upload');
-      }
-
-      const submitData = {
-        pairId: pair.id,
-        userId: currentUser.id,
-        answer: userActivityAnswer.trim(),
-        fileUrl: fileUrl
-      };
-      
-      console.log('Submitting activity answer:', submitData);
-      console.log('File URL being sent:', fileUrl);
-      console.log('Socket connected:', socketRef.current?.connected);
-      console.log('Current user ID:', currentUser.id);
-      console.log('Pair ID:', pair.id);
-      socketRef.current.emit('submit-activity-answer', submitData);
-      setIsActivitySubmitted(true);
-    }
-  };
-
-  console.log(partnerAnswer)
-  console.log('Partner file URL state:', partnerFileUrl)
-  console.log('User file state:', userFile)
-  console.log('User file URL state:', userFileUrl)
-
-  return (
-    <div className="space-y-8 max-w-4xl mx-auto">
-      {/* Header Section */}
-      <div className="text-center">
-        <div className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 rounded-full p-4 mb-6 animate-pulse">
-          <div className="text-5xl">🎪</div>
-        </div>
-        <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-          กิจกรรมสนุกๆ
-        </h2>
-        <div className="flex items-center justify-center space-x-4 mb-6">
-          <div className="bg-white bg-opacity-20 rounded-full px-4 py-2 text-center">
-            <div className="text-white font-semibold">👤 {pair.user1.nickname}</div>
-            {pair.user1.socialMediaHandle && (
-              <div className="text-xs text-gray-200">📱 {pair.user1.socialMediaHandle}</div>
-            )}
-          </div>
-          <div className="text-2xl animate-bounce">🤗
-          </div>
-          <div className="bg-white bg-opacity-20 rounded-full px-4 py-2 text-center">
-            <div className="text-white font-semibold">👤 {pair.user2.nickname}</div>
-            {pair.user2.socialMediaHandle && (
-              <div className="text-xs text-gray-200">📱 {pair.user2.socialMediaHandle}</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Question Section */}
-      <div className="bg-white backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white border-opacity-20">
-        <div className="text-center mb-8">
-          <div className="inline-block bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full p-4 mb-4">
-            <div className="text-4xl">❓</div>
-          </div>
-          <h3 className="text-2xl font-bold text-black mb-2">
-            คำถาม Ice-Breaking
-          </h3>
-          <div className="w-24 h-1 bg-gradient-to-r from-blue-400 to-cyan-400 mx-auto rounded-full"></div>
-        </div>
-
-        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-8 mb-8 border border-blue-200">
-          <p className="text-black text-xl text-center leading-relaxed font-medium">
-            {pair.question}
-          </p>
-        </div>
-
-        <div className="space-y-6">
-          <div>
-            <label className="block text-black font-semibold mb-3 text-lg">
-              💭 คำตอบของคุณ
-            </label>
-            <textarea
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              className="w-full px-6 py-4 rounded-xl border-2 border-gray-200 bg-white bg-opacity-50 text-black placeholder-gray-500 focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100 text-lg resize-none transition-all duration-300"
-              placeholder="แบ่งปันความคิดของคุณที่นี่..."
-              maxLength={200}
-              rows={4}
-              disabled={isSubmitted}
-            />
-            <div className="text-right mt-2">
-              <span className="text-sm text-gray-500">{userAnswer.length}/200</span>
-            </div>
-          </div>
-
-
-          <div className="text-center">
-            <button
-              onClick={handleAnswerSubmit}
-              className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 transform ${
-                isSubmitted
-                  ? 'bg-green-500 text-white cursor-not-allowed'
-                  : userAnswer.trim() && socketRef.current?.connected
-                  ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white hover:from-green-500 hover:to-blue-500 hover:scale-105 shadow-lg hover:shadow-xl'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-              disabled={!userAnswer.trim() || !socketRef.current?.connected || isSubmitted}
-            >
-              {isSubmitted ? '✅ ส่งคำตอบแล้ว' : '📤 ส่งคำตอบ'}
-            </button>
-          </div>
-        </div>
-
-        <div className="text-center mt-8">
-          <button
-            onClick={() => setShowAnswer(!showAnswer)}
-            className="bg-gradient-to-r from-purple-400 to-pink-400 text-white font-semibold py-3 px-8 rounded-xl hover:from-purple-500 hover:to-pink-500 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-          >
-            {showAnswer ? '🙈 ซ่อนคำตอบ' : '👀 ดูคำตอบทั้งคู่'}
-          </button>
-        </div>
-
-        {showAnswer && (
-          <div className="mt-8 space-y-6 animate-fadeIn">
-            <div className="text-center">
-              <h4 className="text-xl font-bold text-black mb-4">💬 คำตอบของทั้งคู่</h4>
-            </div>
-            
-            {/* User's own answer */}
-            {userAnswer && (
-              <div className="bg-gradient-to-r from-blue-100 to-blue-200 rounded-2xl p-6 border-l-4 border-blue-500">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-blue-500 rounded-full p-2">
-                    <span className="text-white text-lg">👤</span>
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="font-bold text-blue-800 text-lg mb-2">{currentUser?.nickname} (คุณ)</h5>
-                    <p className="text-blue-700 text-lg leading-relaxed">{userAnswer}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Partner's answer */}
-            {partnerAnswer ? (
-              <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-6 border-l-4 border-yellow-500">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-yellow-500 rounded-full p-2">
-                    <span className="text-white text-lg">👤</span>
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="font-bold text-yellow-800 text-lg mb-2">
-                      {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
-                      {(pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle) && (
-                        <span className="text-sm text-yellow-600 ml-2">
-                          📱 {pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle}
-                        </span>
-                      )}
-                    </h5>
-                    <p className="text-yellow-700 text-lg leading-relaxed">{partnerAnswer}</p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl p-6 text-center">
-                <div className="text-4xl mb-3">⏳</div>
-                <p className="text-gray-700 text-lg">
-                  {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
-                  {(pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle) && (
-                    <span className="text-sm text-gray-500 ml-2">
-                      📱 {pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle}
-                    </span>
-                  )} ยังไม่ได้ส่งคำตอบ
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Activity Section */}
-      <div className="bg-white backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white border-opacity-20">
-        <div className="text-center mb-8">
-          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-500 rounded-full p-4 mb-4">
-            <div className="text-4xl">🎯</div>
-          </div>
-          <h3 className="text-2xl font-bold text-black mb-2">
-            กิจกรรมสนุก
-          </h3>
-          <div className="w-24 h-1 bg-gradient-to-r from-green-400 to-emerald-400 mx-auto rounded-full"></div>
-        </div>
-
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-8 mb-8 border border-green-200">
-          <p className="text-black text-xl text-center leading-relaxed font-medium">
-            {pair.activity}
-          </p>
-        </div>
-
-        {/* Activity Form */}
-        <div className="space-y-6">
-          <div>
-            <label className="block text-black font-semibold mb-3 text-lg">
-            💭 คำตอบของคุณ
-            </label>
-            <textarea
-              value={userActivityAnswer}
-              onChange={(e) => setUserActivityAnswer(e.target.value)}
-              className="w-full px-6 py-4 rounded-xl border-2 border-gray-200 bg-white bg-opacity-50 text-black placeholder-gray-500 focus:border-green-400 focus:outline-none focus:ring-4 focus:ring-green-100 text-lg resize-none transition-all duration-300"
-              placeholder="แบ่งปันความคิดของคุณที่นี่..."
-              maxLength={300}
-              rows={4}
-              disabled={isActivitySubmitted}
-            />
-            <div className="text-right mt-2">
-              <span className="text-sm text-gray-500">{userActivityAnswer.length}/300</span>
-            </div>
-          </div>
-
-          {/* File Upload for Activity */}
-          <div>
-            <label className="block text-black font-semibold mb-3 text-lg">
-              📎 แนบไฟล์
-            </label>
-            <input
-              type="file"
-              onChange={handleFileChange}
-              accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-white bg-opacity-50 text-black focus:border-green-400 focus:outline-none focus:ring-4 focus:ring-green-100 transition-all duration-300"
-              disabled={isActivitySubmitted}
-              // Safari compatibility - removed capture attribute to prevent camera opening
-              multiple={false}
-            />
-            {userFileUrl && (
-              <div className="mt-3">
-                <p className="text-sm text-gray-600 mb-2">ไฟล์ที่เลือก:</p>
-                {userFile?.type.startsWith('image/') ? (
-                  <img src={userFileUrl} alt="Preview" className="max-w-xs rounded-lg" />
-                ) : (
-                  <p className="text-sm text-green-600">{userFile?.name}</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="text-center">
-            <button
-              onClick={handleActivitySubmit}
-              className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 transform ${
-                isActivitySubmitted
-                  ? 'bg-green-500 text-white cursor-not-allowed'
-                  : userActivityAnswer.trim() && socketRef.current?.connected
-                  ? 'bg-gradient-to-r from-green-400 to-emerald-400 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 shadow-lg hover:shadow-xl'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-              disabled={!userActivityAnswer.trim() || !socketRef.current?.connected || isActivitySubmitted}
-            >
-              {isActivitySubmitted ? '✅ ส่งคำตอบแล้ว' : '📤 ส่งคำตอบ'}
-            </button>
-          </div>
-        </div>
-
-        <div className="text-center mt-8">
-          <button
-            onClick={() => setShowActivityAnswer(!showActivityAnswer)}
-            className="bg-gradient-to-r from-green-400 to-emerald-400 text-white font-semibold py-3 px-8 rounded-xl hover:from-green-500 hover:to-emerald-500 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-          >
-            {showActivityAnswer ? '🙈 ซ่อนคำตอบ' : '👀 ดูคำตอบทั้งคู่'}
-          </button>
-        </div>
-
-        {showActivityAnswer && (
-          <div className="mt-8 space-y-6 animate-fadeIn">
-            <div className="text-center">
-              <h4 className="text-xl font-bold text-black mb-4">🎯 คำตอบของทั้งคู่</h4>
-            </div>
-            
-            {/* User's own activity answer */}
-            {userActivityAnswer && (
-              <div className="bg-gradient-to-r from-green-100 to-green-200 rounded-2xl p-6 border-l-4 border-green-500">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-green-500 rounded-full p-2">
-                    <span className="text-white text-lg">👤</span>
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="font-bold text-green-800 text-lg mb-2">{currentUser?.nickname} (คุณ)</h5>
-                    <p className="text-green-700 text-lg leading-relaxed">{userActivityAnswer}</p>
-                    {userFileUrl && (
-                      <div className="mt-3">
-                        {userFile?.type.startsWith('image/') ? (
-                          <img src={userFileUrl} alt="User file" className="max-w-xs rounded-lg" />
-                        ) : (
-                          <a href={userFileUrl} target="_blank" rel="noopener noreferrer" className="text-green-600 underline">
-                            📎 ดูไฟล์ที่แนบ
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Partner's activity answer */}
-            {partnerActivityAnswer ? (
-              <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-6 border-l-4 border-yellow-500">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-yellow-500 rounded-full p-2">
-                    <span className="text-white text-lg">👤</span>
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="font-bold text-yellow-800 text-lg mb-2">
-                      {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
-                      {(pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle) && (
-                        <span className="text-sm text-yellow-600 ml-2">
-                          📱 {pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle}
-                        </span>
-                      )}
-                    </h5>
-                    <p className="text-yellow-700 text-lg leading-relaxed">{partnerActivityAnswer}</p>
-                    {partnerFileUrl && (
-                      <div className="mt-3">
-                        {partnerFileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                          <img src={partnerFileUrl} alt="Partner's file" className="max-w-xs rounded-lg" onError={(e) => console.error('Image failed to load:', partnerFileUrl, e)} />
-                        ) : (
-                          <a href={partnerFileUrl} target="_blank" rel="noopener noreferrer" className="text-yellow-600 underline">
-                            📎 ดูไฟล์ที่แนบ
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl p-6 text-center">
-                <div className="text-4xl mb-3">⏳</div>
-                <p className="text-gray-700 text-lg">
-                  {pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname}
-                  {(pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle) && (
-                    <span className="text-sm text-gray-500 ml-2">
-                      📱 {pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle}
-                    </span>
-                  )} ยังไม่ได้ส่งคำตอบ
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        
-      </div>
-
-      {/* Friend Request Section - Only show if both users are authenticated */}
-      {isAuthenticated && authUser && (
-        <FriendRequestSection 
-          currentUser={currentUser}
-          pair={pair}
-          authUser={authUser}
-        />
-      )}
-
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <button
-          onClick={onNewGame}
-          className="bg-blue-400 text-white font-semibold py-4 px-8 rounded-xl hover:from-blue-500 hover:to-purple-500 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-lg"
-        >
-          🔄 หาเพื่อนใหม่
-        </button>
-        {/* <button
-          onClick={onLeave}
-          className="bg-orange-400 text-white font-semibold py-3 px-8 rounded-lg hover:from-yellow-500 hover:to-orange-500 transition-all transform hover:scale-105"
-        >
-          🏠 กลับหน้าแรก
-        </button> */}
-      </div>
-    </div>
-  );
-}
-
-// Friend Request Section Component
-function FriendRequestSection({ 
-  currentUser, 
+// Activity Screen Component
+function ActivityScreen({ 
   pair, 
+  onNewGame, 
+  onLeave, 
+  currentUser, 
+  socketRef, 
+  isAuthenticated, 
   authUser 
-}: { 
-  currentUser: User | null
+}: {
   pair: Pair
+  onNewGame: () => void
+  onLeave: () => void
+  currentUser: User | null
+  socketRef: React.RefObject<Socket>
+  isAuthenticated: boolean
   authUser: any
 }) {
-  const { sendFriendRequest } = useAuth()
-  const [friendRequestStatus, setFriendRequestStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
-  const [errorMessage, setErrorMessage] = useState('')
+  const [userAnswer, setUserAnswer] = useState('')
+  const [partnerAnswer, setPartnerAnswer] = useState('')
+  const [userActivityAnswer, setUserActivityAnswer] = useState('')
+  const [partnerActivityAnswer, setPartnerActivityAnswer] = useState('')
+  const [partnerFileUrl, setPartnerFileUrl] = useState<string | null>(null)
+  const [currentPhase, setCurrentPhase] = useState<'question' | 'activity'>('question')
+  const [file, setFile] = useState<File | null>(null)
+  const [fileUrl, setFileUrl] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
+  const [isSubmittingActivity, setIsSubmittingActivity] = useState(false)
+  const [answerSubmitted, setAnswerSubmitted] = useState(false)
+  const [activitySubmitted, setActivitySubmitted] = useState(false)
 
-  // Get the partner's user ID and nickname
-  const partner = pair.user1.id === currentUser?.id ? pair.user2 : pair.user1
-  const partnerId = partner.userId || partner.id // Use actual user ID if available, fallback to socket ID
-  const partnerNickname = partner.nickname
+  useEffect(() => {
+    if (!socketRef.current) return
 
-  const handleSendFriendRequest = async () => {
-    if (!currentUser || !authUser) return
+    const socket = socketRef.current
 
-    setFriendRequestStatus('sending')
-    setErrorMessage('')
-
-    try {
-      // Use the actual user ID if available, otherwise fallback to socket ID
-      console.log('Sending friend request to partner:', {
-        partnerId,
-        partnerUserId: partner.userId,
-        partnerSocketId: partner.id,
-        currentUserId: authUser.id
-      })
-      const success = await sendFriendRequest(partnerId)
-      
-      if (success) {
-        setFriendRequestStatus('sent')
-      } else {
-        setFriendRequestStatus('error')
-        setErrorMessage('ไม่สามารถส่งคำขอเป็นเพื่อนได้')
+    const handleReceiveAnswer = (data: { userId: string, answer: string }) => {
+      if (data.userId !== currentUser?.id) {
+        setPartnerAnswer(data.answer)
+        // Show notification that partner's answer was received
+        console.log('Partner answer received!')
       }
-    } catch (error) {
-      setFriendRequestStatus('error')
-      setErrorMessage('เกิดข้อผิดพลาดในการส่งคำขอเป็นเพื่อน')
+    }
+
+    const handleReceiveActivityAnswer = (data: { userId: string, answer: string, fileUrl?: string }) => {
+      if (data.userId !== currentUser?.id) {
+        setPartnerActivityAnswer(data.answer)
+        if (data.fileUrl) {
+          setPartnerFileUrl(data.fileUrl)
+        }
+        // Show notification that partner's activity was received
+        console.log('Partner activity received!')
+      }
+    }
+
+    socket.on('receive-answer', handleReceiveAnswer)
+    socket.on('receive-activity-answer', handleReceiveActivityAnswer)
+
+    return () => {
+      socket.off('receive-answer', handleReceiveAnswer)
+      socket.off('receive-activity-answer', handleReceiveActivityAnswer)
+    }
+  }, [currentUser, socketRef])
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      setFile(selectedFile)
     }
   }
 
+  const uploadFile = async (): Promise<string | null> => {
+    if (!file) return null
+
+    setIsUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
+        ? 'https://api.ionize13.com'
+        : 'http://localhost:3000'
+
+      const response = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        return data.fileUrl
+      }
+      return null
+    } catch (error) {
+      console.error('Upload error:', error)
+      return null
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const submitAnswer = () => {
+    if (socketRef.current && userAnswer.trim()) {
+      setIsSubmittingAnswer(true)
+      socketRef.current.emit('submit-answer', {
+        pairId: pair.id,
+        userId: currentUser?.id,
+        answer: userAnswer.trim()
+      })
+      
+      // Simulate submission delay and then show success
+      setTimeout(() => {
+        setIsSubmittingAnswer(false)
+        setAnswerSubmitted(true)
+      }, 1000)
+    }
+  }
+
+  const submitActivityAnswer = async () => {
+    if (socketRef.current && userActivityAnswer.trim()) {
+      setIsSubmittingActivity(true)
+      
+      let uploadedFileUrl = null
+      if (file) {
+        uploadedFileUrl = await uploadFile()
+        if (uploadedFileUrl) {
+          setFileUrl(uploadedFileUrl)
+        }
+      }
+
+      socketRef.current.emit('submit-activity-answer', {
+        pairId: pair.id,
+        userId: currentUser?.id,
+        answer: userActivityAnswer.trim(),
+        fileUrl: uploadedFileUrl
+      })
+      
+      // Simulate submission delay and then show success
+      setTimeout(() => {
+        setIsSubmittingActivity(false)
+        setActivitySubmitted(true)
+      }, 1000)
+    }
+  }
+
+  const getPartnerName = () => {
+    return pair.user1.id === currentUser?.id ? pair.user2.nickname : pair.user1.nickname
+  }
+
+  const getPartnerSocialMediaHandle = () => {
+    return pair.user1.id === currentUser?.id ? pair.user2.socialMediaHandle : pair.user1.socialMediaHandle
+  }
+
   return (
-    <div className="bg-white backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white border-opacity-20">
-      <div className="text-center mb-6">
-        <div className="inline-block bg-gradient-to-r from-pink-500 to-purple-500 rounded-full p-4 mb-4">
-          <div className="text-4xl">👥</div>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="bg-white backdrop-blur-lg rounded-2xl p-6 text-center">
+        <h2 className="text-2xl font-bold text-black mb-4">
+          {currentPhase === 'question' ? 'คำถาม' : 'กิจกรรม'}
+        </h2>
+        <div className="flex items-center justify-center space-x-4 mb-6">
+          <div className="bg-white bg-opacity-20 rounded-full px-4 py-2">
+            <span className="font-semibold">👤 {pair.user1.nickname}</span>
+            {pair.user1.socialMediaHandle && (
+              <span className="text-sm ml-2">📱 {pair.user1.socialMediaHandle}</span>
+            )}
+          </div>
+          <div className="text-2xl animate-bounce">🤗</div>
+          <div className="bg-white bg-opacity-20 rounded-full px-4 py-2">
+            <span className="font-semibold">👤 {pair.user2.nickname}</span>
+            {pair.user2.socialMediaHandle && (
+              <span className="text-sm ml-2">📱 {pair.user2.socialMediaHandle}</span>
+            )}
+          </div>
         </div>
-        <h3 className="text-2xl font-bold text-black mb-2">
-          เพิ่มเพื่อน
-        </h3>
-        <div className="w-24 h-1 bg-gradient-to-r from-pink-400 to-purple-400 mx-auto rounded-full"></div>
       </div>
 
-      <div className="text-center">
-        <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl p-6 mb-6 border border-pink-200">
-          <p className="text-black text-lg mb-4">
-            คุณสนุกกับการเล่นกับ <strong>{partnerNickname}</strong> หรือไม่?
-          </p>
-          <p className="text-gray-600 text-sm">
-            เพิ่มเป็นเพื่อนเพื่อติดต่อกันได้ในอนาคต!
-          </p>
-        </div>
-
-        {friendRequestStatus === 'idle' && (
-          <button
-            onClick={handleSendFriendRequest}
-            className="bg-gradient-to-r from-pink-400 to-purple-400 text-white font-semibold py-3 px-8 rounded-xl hover:from-pink-500 hover:to-purple-500 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-          >
-            👥 ส่งคำขอเป็นเพื่อน
-          </button>
-        )}
-
-        {friendRequestStatus === 'sending' && (
-          <div className="flex items-center justify-center space-x-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-600"></div>
-            <span className="text-black">กำลังส่งคำขอ...</span>
+      {currentPhase === 'question' ? (
+        <div className="space-y-6">
+          {/* Question */}
+          <div className="bg-white backdrop-blur-lg rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-black mb-4">คำถาม</h3>
+            <p className="text-lg text-black leading-relaxed">{pair.question}</p>
           </div>
-        )}
 
-        {friendRequestStatus === 'sent' && (
-          <div className="bg-green-100 border border-green-300 rounded-xl p-4">
-            <div className="flex items-center justify-center space-x-2">
-              <div className="text-green-600 text-2xl">✅</div>
-              <span className="text-green-800 font-semibold">ส่งคำขอเป็นเพื่อนแล้ว!</span>
-            </div>
-            <p className="text-green-700 text-sm mt-2">
-              รอให้ {partnerNickname} ยอมรับคำขอของคุณ
-            </p>
-          </div>
-        )}
-
-        {friendRequestStatus === 'error' && (
-          <div className="bg-red-100 border border-red-300 rounded-xl p-4">
-            <div className="flex items-center justify-center space-x-2">
-              <div className="text-red-600 text-2xl">❌</div>
-              <span className="text-red-800 font-semibold">เกิดข้อผิดพลาด</span>
-            </div>
-            <p className="text-red-700 text-sm mt-2">
-              {errorMessage}
-            </p>
+          {/* Answer Input */}
+          <div className="bg-white backdrop-blur-lg rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-black mb-4">คำตอบของคุณ</h3>
+            <textarea
+              value={userAnswer}
+              onChange={(e) => setUserAnswer(e.target.value)}
+              className="w-full h-32 px-4 py-3 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-black placeholder-black placeholder-opacity-60 focus:border-opacity-60 focus:outline-none resize-none"
+              placeholder="เขียนคำตอบของคุณที่นี่..."
+            />
             <button
-              onClick={() => setFriendRequestStatus('idle')}
-              className="mt-3 text-red-600 hover:text-red-700 underline text-sm"
+              onClick={submitAnswer}
+              disabled={!userAnswer.trim() || isSubmittingAnswer || answerSubmitted}
+              className={`mt-4 px-6 py-2 rounded-lg transition-colors ${
+                answerSubmitted 
+                  ? 'bg-green-500 text-white cursor-not-allowed' 
+                  : isSubmittingAnswer
+                  ? 'bg-blue-400 text-white cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed'
+              }`}
             >
-              ลองใหม่
+              {answerSubmitted ? '✅ ส่งแล้ว' : isSubmittingAnswer ? '⏳ กำลังส่ง...' : 'ส่งคำตอบ'}
             </button>
+            
+            {answerSubmitted && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-green-700 text-sm text-center">
+                  ✅ คำตอบของคุณถูกส่งแล้ว! รอคู่ของคุณส่งคำตอบ
+                </p>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Partner's Answer */}
+          {partnerAnswer ? (
+            <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-6 animate-pulse">
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  👤
+                </div>
+                <div className="flex-1">
+                  <h5 className="font-bold text-yellow-800 text-lg mb-2">
+                    {getPartnerName()}
+                    {getPartnerSocialMediaHandle() && (
+                      <span className="text-yellow-700 text-sm ml-2">📱 {getPartnerSocialMediaHandle()}</span>
+                    )}
+                  </h5>
+                  <p className="text-yellow-700 text-lg leading-relaxed">{partnerAnswer}</p>
+                  <div className="mt-2 text-xs text-yellow-600">
+                    ✨ คำตอบใหม่จากคู่ของคุณ!
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl p-6 text-center">
+              <div className="text-4xl mb-3">⏳</div>
+              <p className="text-gray-700 text-lg">
+                {getPartnerName()}
+                {getPartnerSocialMediaHandle() && (
+                  <span className="text-gray-600 text-sm ml-2">📱 {getPartnerSocialMediaHandle()}</span>
+                )}
+                ยังไม่ได้ส่งคำตอบ
+              </p>
+            </div>
+          )}
+
+          {/* Next Phase Button */}
+          {userAnswer && partnerAnswer && (
+            <div className="text-center">
+              <button
+                onClick={() => setCurrentPhase('activity')}
+                className="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-colors text-lg font-semibold"
+              >
+                ไปยังกิจกรรมต่อไป →
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Activity */}
+          <div className="bg-white backdrop-blur-lg rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-black mb-4">กิจกรรม</h3>
+            <p className="text-lg text-black leading-relaxed">{pair.activity}</p>
+          </div>
+
+          {/* Activity Answer Input */}
+          <div className="bg-white backdrop-blur-lg rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-black mb-4">ผลงานของคุณ</h3>
+            <textarea
+              value={userActivityAnswer}
+              onChange={(e) => setUserActivityAnswer(e.target.value)}
+              className="w-full h-32 px-4 py-3 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-black placeholder-black placeholder-opacity-60 focus:border-opacity-60 focus:outline-none resize-none"
+              placeholder="เขียนผลงานของคุณที่นี่..."
+            />
+            
+            {/* File Upload */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-black mb-2">
+                อัปโหลดไฟล์ (ไม่บังคับ)
+              </label>
+              <input
+                type="file"
+                onChange={handleFileChange}
+                accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                className="w-full px-4 py-2 rounded-lg border-2 border-white border-opacity-30 bg-white bg-opacity-10 text-black"
+              />
+              {file && (
+                <p className="text-sm text-black opacity-80 mt-1">
+                  ไฟล์ที่เลือก: {file.name}
+                </p>
+              )}
+            </div>
+
+            <button
+              onClick={submitActivityAnswer}
+              disabled={!userActivityAnswer.trim() || isUploading || isSubmittingActivity || activitySubmitted}
+              className={`mt-4 px-6 py-2 rounded-lg transition-colors ${
+                activitySubmitted 
+                  ? 'bg-green-500 text-white cursor-not-allowed' 
+                  : isSubmittingActivity || isUploading
+                  ? 'bg-blue-400 text-white cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed'
+              }`}
+            >
+              {activitySubmitted 
+                ? '✅ ส่งแล้ว' 
+                : isSubmittingActivity 
+                ? '⏳ กำลังส่ง...' 
+                : isUploading 
+                ? '📤 กำลังอัปโหลด...' 
+                : 'ส่งผลงาน'
+              }
+            </button>
+            
+            {activitySubmitted && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-green-700 text-sm text-center">
+                  ✅ ผลงานของคุณถูกส่งแล้ว! รอคู่ของคุณส่งผลงาน
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Partner's Activity Answer */}
+          {partnerActivityAnswer ? (
+            <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-6 animate-pulse">
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  👤
+                </div>
+                <div className="flex-1">
+                  <h5 className="font-bold text-yellow-800 text-lg mb-2">
+                    {getPartnerName()}
+                    {getPartnerSocialMediaHandle() && (
+                      <span className="text-yellow-700 text-sm ml-2">📱 {getPartnerSocialMediaHandle()}</span>
+                    )}
+                  </h5>
+                  <p className="text-yellow-700 text-lg leading-relaxed">{partnerActivityAnswer}</p>
+                  {partnerFileUrl && (
+                    <div className="mt-3">
+                      <a
+                        href={partnerFileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
+                      >
+                        📎 ดูไฟล์
+                      </a>
+                    </div>
+                  )}
+                  <div className="mt-2 text-xs text-yellow-600">
+                    ✨ ผลงานใหม่จากคู่ของคุณ!
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl p-6 text-center">
+              <div className="text-4xl mb-3">⏳</div>
+              <p className="text-gray-700 text-lg">
+                {getPartnerName()}
+                {getPartnerSocialMediaHandle() && (
+                  <span className="text-gray-600 text-sm ml-2">📱 {getPartnerSocialMediaHandle()}</span>
+                )}
+                ยังไม่ได้ส่งคำตอบ
+              </p>
+            </div>
+          )}
+
+          {/* Show user's uploaded file */}
+          {fileUrl && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+              <h4 className="font-bold text-blue-900 mb-2">ไฟล์ที่คุณอัปโหลด</h4>
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                📎 ดูไฟล์ของคุณ
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex justify-center space-x-4">
+        <button
+          onClick={onNewGame}
+          className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors"
+        >
+          เกมใหม่
+        </button>
+        <button
+          onClick={onLeave}
+          className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors"
+        >
+          ออกจากเกม
+        </button>
       </div>
     </div>
   )
 }
-

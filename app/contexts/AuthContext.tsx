@@ -7,6 +7,7 @@ interface User {
   email: string
   nickname: string
   socialMediaHandle?: string
+  profilePicture?: string
   createdAt: string
 }
 
@@ -31,6 +32,7 @@ interface AuthContextType {
   signup: (email: string, password: string, nickname: string, socialMediaHandle?: string) => Promise<boolean>
   logout: () => void
   updateSocialMediaHandle: (socialMediaHandle: string) => Promise<boolean>
+  updateProfilePicture: (profilePicture: string) => Promise<boolean>
   sendFriendRequest: (friendId: string) => Promise<boolean>
   acceptFriendRequest: (friendId: string) => Promise<boolean>
   rejectFriendRequest: (friendId: string) => Promise<boolean>
@@ -209,6 +211,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return false
     } catch (error) {
       console.error('Update social media handle error:', error)
+      return false
+    }
+  }
+
+  const updateProfilePicture = async (profilePicture: string): Promise<boolean> => {
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
+        ? 'https://api.ionize13.com'
+        : 'http://localhost:3000'
+      
+      const token = localStorage.getItem('authToken')
+      if (!token) return false
+
+      const response = await fetch(`${API_BASE}/api/user/profile-picture`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ profilePicture }),
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setUser(data.user)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Update profile picture error:', error)
       return false
     }
   }
@@ -418,6 +452,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signup,
     logout,
     updateSocialMediaHandle,
+    updateProfilePicture,
     sendFriendRequest,
     acceptFriendRequest,
     rejectFriendRequest,

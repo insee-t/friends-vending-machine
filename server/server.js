@@ -269,12 +269,13 @@ io.on('connection', (socket) => {
 
   // User joins the waiting room
   socket.on('join-waiting', (data) => {
-    const { nickname, socialMediaHandle, userId } = data;
+    const { nickname, socialMediaHandle, profilePicture, userId } = data;
     const user = {
       id: socket.id,
       userId: userId || null, // Store the actual user ID if available
       nickname: nickname.trim(),
       socialMediaHandle: socialMediaHandle || null,
+      profilePicture: profilePicture || null,
       joinedAt: Date.now(),
       status: 'waiting',
       socketId: socket.id
@@ -815,6 +816,7 @@ app.get('/api/auth/verify', authenticateToken, async (req, res) => {
       email: user.email,
       nickname: user.nickname,
       socialMediaHandle: user.social_media_handle,
+      profilePicture: user.profile_picture,
       createdAt: user.created_at
     };
     
@@ -853,6 +855,7 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
       email: user.email,
       nickname: user.nickname,
       socialMediaHandle: user.social_media_handle,
+      profilePicture: user.profile_picture,
       createdAt: user.created_at,
       lastLogin: user.last_login,
       gameHistory: gameHistory
@@ -897,6 +900,7 @@ app.put('/api/user/social-media-handle', authenticateToken, async (req, res) => 
       email: user.email,
       nickname: user.nickname,
       socialMediaHandle: user.social_media_handle,
+      profilePicture: user.profile_picture,
       createdAt: user.created_at
     };
     
@@ -907,6 +911,49 @@ app.put('/api/user/social-media-handle', authenticateToken, async (req, res) => 
 
   } catch (error) {
     console.error('Update social media handle error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+});
+
+// Update profile picture
+app.put('/api/user/profile-picture', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { profilePicture } = req.body;
+
+    // Validate input
+    if (profilePicture && profilePicture.length > 500) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Profile picture URL must be 500 characters or less' 
+      });
+    }
+
+    // Update profile picture
+    await db.updateProfilePicture(userId, profilePicture);
+
+    // Get updated user data
+    const user = await db.getUserByEmail(req.user.email);
+    
+    const userData = {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      socialMediaHandle: user.social_media_handle,
+      profilePicture: user.profile_picture,
+      createdAt: user.created_at
+    };
+    
+    res.json({
+      success: true,
+      user: userData
+    });
+
+  } catch (error) {
+    console.error('Update profile picture error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 

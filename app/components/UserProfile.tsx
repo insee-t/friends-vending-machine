@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 export const UserProfile: React.FC = () => {
-  const { user, logout, updateSocialMediaHandle, getFriends, getFriendRequests, acceptFriendRequest, rejectFriendRequest } = useAuth()
+  const { user, logout, updateSocialMediaHandle, updateProfilePicture, getFriends, getFriendRequests, acceptFriendRequest, rejectFriendRequest } = useAuth()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isEditingSocialHandle, setIsEditingSocialHandle] = useState(false)
   const [socialHandleInput, setSocialHandleInput] = useState('')
@@ -13,6 +13,8 @@ export const UserProfile: React.FC = () => {
   const [friendRequests, setFriendRequests] = useState<any[]>([])
   const [showFriends, setShowFriends] = useState(false)
   const [isLoadingFriends, setIsLoadingFriends] = useState(false)
+  const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false)
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null)
 
   const handleSocialHandleSubmit = async () => {
     if (isUpdating) return
@@ -34,6 +36,72 @@ export const UserProfile: React.FC = () => {
   const handleCancelEdit = () => {
     setIsEditingSocialHandle(false)
     setSocialHandleInput('')
+  }
+
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น')
+        return
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('ขนาดไฟล์ต้องไม่เกิน 5MB')
+        return
+      }
+      
+      setProfilePictureFile(file)
+    }
+  }
+
+  const handleProfilePictureUpload = async () => {
+    if (!profilePictureFile || isUploadingProfilePicture) return
+    
+    setIsUploadingProfilePicture(true)
+    
+    try {
+      // Upload file first
+      const formData = new FormData()
+      formData.append('file', profilePictureFile)
+      
+      const API_BASE = process.env.NEXT_PUBLIC_APP_ENV === 'production' 
+        ? 'https://api.ionize13.com'
+        : 'http://localhost:3000'
+      
+      const response = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.fileUrl) {
+          // Update profile picture in database
+          const success = await updateProfilePicture(result.fileUrl)
+          if (success) {
+            setProfilePictureFile(null)
+            // Reset file input
+            const fileInput = document.getElementById('profile-picture-input') as HTMLInputElement
+            if (fileInput) fileInput.value = ''
+          } else {
+            alert('ไม่สามารถอัปเดตรูปโปรไฟล์ได้')
+          }
+        } else {
+          alert('ไม่สามารถอัปโหลดไฟล์ได้')
+        }
+      } else {
+        alert('ไม่สามารถอัปโหลดไฟล์ได้')
+      }
+    } catch (error) {
+      console.error('Profile picture upload error:', error)
+      alert('เกิดข้อผิดพลาดในการอัปโหลด')
+    } finally {
+      setIsUploadingProfilePicture(false)
+    }
   }
 
   const loadFriends = async () => {
@@ -81,9 +149,17 @@ export const UserProfile: React.FC = () => {
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         className="flex items-center gap-2 bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-opacity-30 transition-all"
       >
-        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-          {user.nickname.charAt(0).toUpperCase()}
-        </div>
+        {user.profilePicture ? (
+          <img 
+            src={user.profilePicture} 
+            alt={user.nickname}
+            className="w-8 h-8 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+            {user.nickname.charAt(0).toUpperCase()}
+          </div>
+        )}
         <span className="text-white font-medium hidden sm:block">
           {user.nickname}
         </span>
@@ -110,9 +186,17 @@ export const UserProfile: React.FC = () => {
           <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 z-20">
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
-                  {user.nickname.charAt(0).toUpperCase()}
-                </div>
+                {user.profilePicture ? (
+                  <img 
+                    src={user.profilePicture} 
+                    alt={user.nickname}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+                    {user.nickname.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <h3 className="font-semibold text-gray-900">{user.nickname}</h3>
                   <p className="text-sm text-gray-500">{user.email}</p>
@@ -125,9 +209,44 @@ export const UserProfile: React.FC = () => {
                 สมาชิกตั้งแต่: {new Date(user.createdAt).toLocaleDateString('th-TH')}
               </div>
               
+              {/* Profile Picture Section */}
+              <div className="px-3 py-2 border-t border-gray-100">
+                <div className="text-sm text-gray-600 mb-2">รูปโปรไฟล์</div>
+                <div className="space-y-2">
+                  <input
+                    id="profile-picture-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {profilePictureFile && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleProfilePictureUpload}
+                        disabled={isUploadingProfilePicture}
+                        className="px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isUploadingProfilePicture ? 'กำลังอัปโหลด...' : 'อัปโหลด'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setProfilePictureFile(null)
+                          const fileInput = document.getElementById('profile-picture-input') as HTMLInputElement
+                          if (fileInput) fileInput.value = ''
+                        }}
+                        className="px-3 py-1 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600"
+                      >
+                        ยกเลิก
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
               {/* Social Media Handle Section */}
               <div className="px-3 py-2 border-t border-gray-100">
-                <div className="text-sm text-gray-600 mb-2">Social Media Handle</div>
+                <div className="text-sm text-gray-600 mb-2">IG / Facebook</div>
                 {isEditingSocialHandle ? (
                   <div className="space-y-2">
                     <input

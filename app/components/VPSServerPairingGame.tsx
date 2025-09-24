@@ -9,6 +9,7 @@ interface User {
   userId?: string | null
   nickname: string
   socialMediaHandle?: string | null
+  profilePicture?: string | null
   joinedAt: number
   status: 'waiting' | 'paired'
   socketId: string
@@ -57,6 +58,7 @@ export default function VPSServerPairingGame() {
         id: socketRef.current.id,
         nickname: nickname.trim(),
         socialMediaHandle: socialMediaHandle || null,
+        profilePicture: isAuthenticated ? authUser?.profilePicture || null : null,
         joinedAt: Date.now(),
         status: 'waiting' as const,
         socketId: socketRef.current.id
@@ -69,6 +71,7 @@ export default function VPSServerPairingGame() {
       socketRef.current.emit('join-waiting', {
         nickname: nickname.trim(),
         socialMediaHandle: socialMediaHandle || null,
+        profilePicture: isAuthenticated ? authUser?.profilePicture || null : null,
         userId: isAuthenticated ? authUser?.id : null
       })
     }
@@ -303,9 +306,17 @@ function NicknameInput({
         <div className="space-y-6">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-center space-x-3">
-              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-                {authUser?.nickname?.charAt(0).toUpperCase()}
-              </div>
+              {authUser?.profilePicture ? (
+                <img 
+                  src={authUser.profilePicture} 
+                  alt={authUser.nickname}
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+                  {authUser?.nickname?.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div>
                 <p className="font-semibold text-blue-900">{authUser?.nickname}</p>
                 {authUser?.socialMediaHandle && (
@@ -411,7 +422,19 @@ function WaitingRoom({
   return (
     <div className="bg-white backdrop-blur-lg rounded-2xl p-8 max-w-4xl mx-auto">
       <div className="text-center mb-6">
-        <div className="text-6xl mb-4">⏳</div>
+        <div className="flex justify-center items-center mb-4">
+          {currentUser?.profilePicture ? (
+            <img 
+              src={currentUser.profilePicture} 
+              alt={currentUser.nickname}
+              className="w-20 h-20 rounded-full object-cover border-4 border-blue-200"
+            />
+          ) : (
+            <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-3xl border-4 border-blue-200">
+              {currentUser?.nickname?.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
         <h2 className="text-2xl font-bold text-black mb-2">กำลังหาคู่ให้คุณ</h2>
         <div className="flex items-center justify-center space-x-2 mb-2">
           <span className="text-black opacity-80">การจับคู่ครั้งต่อไปใน:</span>
@@ -428,9 +451,17 @@ function WaitingRoom({
           {/* Current User */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-center space-x-3">
-              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-                {currentUser?.nickname?.charAt(0).toUpperCase()}
-              </div>
+              {currentUser?.profilePicture ? (
+                <img 
+                  src={currentUser.profilePicture} 
+                  alt={currentUser.nickname}
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                  {currentUser?.nickname?.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div>
                 <p className="font-semibold text-blue-900">{currentUser?.nickname}</p>
                 {currentUser?.socialMediaHandle && (
@@ -451,9 +482,17 @@ function WaitingRoom({
                 {otherWaitingUsers.map(user => (
                   <div key={user.id} className="bg-white bg-opacity-20 rounded-lg p-3">
                     <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                        {user.nickname.charAt(0).toUpperCase()}
-                      </div>
+                      {user.profilePicture ? (
+                        <img 
+                          src={user.profilePicture} 
+                          alt={user.nickname}
+                          className="w-12 h-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                          {user.nickname.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div>
                         <span className="text-black font-medium">
                           {user.nickname}
@@ -1019,7 +1058,31 @@ function PairingResult({ pair, group }: { pair: Pair | null, group: Group | null
     return (
       <div className="bg-white backdrop-blur-lg rounded-2xl p-8 max-w-2xl mx-auto">
         <div className="text-center mb-6">
-          <div className="text-6xl mb-4">🎉</div>
+          <div className="flex justify-center items-center space-x-4 mb-4">
+            {pair.user1.profilePicture ? (
+              <img 
+                src={pair.user1.profilePicture} 
+                alt={pair.user1.nickname}
+                className="w-20 h-20 rounded-full object-cover border-4 border-green-200"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-white font-bold text-3xl border-4 border-green-200">
+                {pair.user1.nickname.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="text-4xl">🤝</div>
+            {pair.user2.profilePicture ? (
+              <img 
+                src={pair.user2.profilePicture} 
+                alt={pair.user2.nickname}
+                className="w-20 h-20 rounded-full object-cover border-4 border-green-200"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-white font-bold text-3xl border-4 border-green-200">
+                {pair.user2.nickname.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
           <h2 className="text-2xl font-bold text-black mb-2">พบคู่แล้ว!</h2>
           <p className="text-black opacity-80">คุณได้คู่แล้ว กำลังเตรียมความสนุกให้คุณ...</p>
         </div>
@@ -1055,7 +1118,26 @@ function PairingResult({ pair, group }: { pair: Pair | null, group: Group | null
     return (
       <div className="bg-white backdrop-blur-lg rounded-2xl p-8 max-w-4xl mx-auto">
         <div className="text-center mb-6">
-          <div className="text-6xl mb-4">🎉</div>
+          <div className="flex justify-center items-center space-x-2 mb-4">
+            {group.members.map((member, index) => (
+              <div key={member.id} className="flex items-center">
+                {member.profilePicture ? (
+                  <img 
+                    src={member.profilePicture} 
+                    alt={member.nickname}
+                    className="w-16 h-16 rounded-full object-cover border-4 border-green-200"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white font-bold text-xl border-4 border-green-200">
+                    {member.nickname.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {index < group.members.length - 1 && (
+                  <div className="text-2xl mx-1">🤝</div>
+                )}
+              </div>
+            ))}
+          </div>
           <h2 className="text-2xl font-bold text-black mb-2">พบกลุ่มแล้ว!</h2>
           <p className="text-black opacity-80">คุณได้เข้ากลุ่มแล้ว กำลังเตรียมความสนุกให้คุณ...</p>
         </div>
@@ -1138,7 +1220,7 @@ function ActivityScreen({
 
   // Helper function to get partner answers for current question
   const getPartnerAnswersForCurrentQuestion = () => {
-    const answers: {userId: string, nickname: string, answer: string, socialMediaHandle?: string}[] = []
+    const answers: {userId: string, nickname: string, answer: string, socialMediaHandle?: string, profilePicture?: string}[] = []
     
     if (pair) {
       const partner = pair.user1.id === currentUser?.id ? pair.user2 : pair.user1
@@ -1148,7 +1230,8 @@ function ActivityScreen({
           userId: partner.id,
           nickname: partner.nickname,
           answer: partnerAnswer,
-          socialMediaHandle: partner.socialMediaHandle || undefined
+          socialMediaHandle: partner.socialMediaHandle || undefined,
+          profilePicture: partner.profilePicture || undefined
         })
       }
     } else if (group) {
@@ -1160,7 +1243,8 @@ function ActivityScreen({
             userId: member.id,
             nickname: member.nickname,
             answer: memberAnswer,
-            socialMediaHandle: member.socialMediaHandle || undefined
+            socialMediaHandle: member.socialMediaHandle || undefined,
+            profilePicture: member.profilePicture || undefined
           })
         }
       })
@@ -1171,7 +1255,7 @@ function ActivityScreen({
 
   // Helper function to get partner activity answers
   const getPartnerActivityAnswers = () => {
-    const answers: {userId: string, nickname: string, answer: string, fileUrl?: string, socialMediaHandle?: string}[] = []
+    const answers: {userId: string, nickname: string, answer: string, fileUrl?: string, socialMediaHandle?: string, profilePicture?: string}[] = []
     
     if (pair) {
       const partner = pair.user1.id === currentUser?.id ? pair.user2 : pair.user1
@@ -1182,7 +1266,8 @@ function ActivityScreen({
           nickname: partner.nickname,
           answer: partnerActivity.answer,
           fileUrl: partnerActivity.fileUrl,
-          socialMediaHandle: partner.socialMediaHandle || undefined
+          socialMediaHandle: partner.socialMediaHandle || undefined,
+          profilePicture: partner.profilePicture || undefined
         })
       }
     } else if (group) {
@@ -1195,7 +1280,8 @@ function ActivityScreen({
             nickname: member.nickname,
             answer: memberActivity.answer,
             fileUrl: memberActivity.fileUrl,
-            socialMediaHandle: member.socialMediaHandle || undefined
+            socialMediaHandle: member.socialMediaHandle || undefined,
+            profilePicture: member.profilePicture || undefined
           })
         }
       })
@@ -1529,7 +1615,7 @@ function ActivityScreen({
             {answerSubmitted[currentQuestionIndex] && (
               <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="text-green-700 text-sm text-center">
-                  ✅ คำตอบของคุณถูกส่งแล้ว! รอคู่ของคุณส่งคำตอบ
+                  ✅ คำตอบของคุณถูกส่งแล้ว! รอเพื่อนของคุณส่งคำตอบ
                 </p>
               </div>
             )}
@@ -1543,9 +1629,17 @@ function ActivityScreen({
                 {partnerAnswersForQuestion.map((partnerAnswer, index) => (
                   <div key={partnerAnswer.userId} className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-6 animate-pulse">
                     <div className="flex items-start space-x-4">
-                      <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                        👤
-                      </div>
+                      {partnerAnswer.profilePicture ? (
+                        <img 
+                          src={partnerAnswer.profilePicture} 
+                          alt={partnerAnswer.nickname}
+                          className="w-16 h-16 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                          {partnerAnswer.nickname.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div className="flex-1">
                         <h5 className="font-bold text-yellow-800 text-lg mb-2">
                           {partnerAnswer.nickname}
@@ -1554,9 +1648,7 @@ function ActivityScreen({
                           )}
                         </h5>
                         <p className="text-yellow-700 text-lg leading-relaxed">{partnerAnswer.answer}</p>
-                        <div className="mt-2 text-xs text-yellow-600">
-                          ✨ คำตอบใหม่จาก{group ? 'สมาชิกกลุ่ม' : 'คู่ของคุณ'}!
-                        </div>
+
                       </div>
                     </div>
                   </div>
@@ -1643,9 +1735,17 @@ function ActivityScreen({
                 {group.members.filter(member => member.id !== currentUser?.id).map((member, index) => (
                   <div key={member.id} className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-6">
                     <div className="flex items-center space-x-4 mb-4">
-                      <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-2xl">
-                        {member.nickname.charAt(0).toUpperCase()}
-                      </div>
+                      {member.profilePicture ? (
+                        <img 
+                          src={member.profilePicture} 
+                          alt={member.nickname}
+                          className="w-16 h-16 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-2xl">
+                          {member.nickname.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div>
                         <h4 className="font-bold text-yellow-900 text-xl">{member.nickname}</h4>
                         <p className="text-yellow-700 text-sm">สมาชิกกลุ่ม</p>
@@ -1653,7 +1753,6 @@ function ActivityScreen({
                     </div>
                     {member.socialMediaHandle ? (
                       <div className="bg-white bg-opacity-60 rounded-lg p-6">
-                        <p className="text-yellow-800 font-semibold mb-3 text-lg">📱 Social Media:</p>
                         <p className="text-yellow-700 text-xl font-medium">{member.socialMediaHandle}</p>
                         <p className="text-yellow-600 text-sm mt-2">💡 ติดต่อเพื่อนใหม่ได้เลย!</p>
                       </div>
@@ -1680,7 +1779,7 @@ function ActivityScreen({
                       <div className="text-center mt-4">
                         <div className="flex items-center justify-center space-x-2">
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600"></div>
-                          <span className="text-black text-sm">กำลังส่งคำขอ...</span>
+                          <span className="text-b lack text-sm">กำลังส่งคำขอ...</span>
                         </div>
                       </div>
                     )}
@@ -1740,9 +1839,20 @@ function ActivityScreen({
               // Pair contact information
               <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-6">
                 <div className="flex items-center space-x-4 mb-4">
-                  <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-2xl">
-                    {getPartnerName().charAt(0).toUpperCase()}
-                  </div>
+                  {(() => {
+                    const partner = pair ? (pair.user1.id === currentUser?.id ? pair.user2 : pair.user1) : null
+                    return partner?.profilePicture ? (
+                      <img 
+                        src={partner.profilePicture} 
+                        alt={partner.nickname}
+                        className="w-16 h-16 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-2xl">
+                        {getPartnerName().charAt(0).toUpperCase()}
+                      </div>
+                    )
+                  })()}
                   <div>
                     <h4 className="font-bold text-yellow-900 text-xl">{getPartnerName()}</h4>
                     <p className="text-yellow-700 text-sm">เพื่อนใหม่ของคุณ</p>

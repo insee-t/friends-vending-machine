@@ -31,6 +31,7 @@ class Database {
           nickname TEXT NOT NULL,
           password_hash TEXT NOT NULL,
           social_media_handle TEXT,
+          profile_picture TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           last_login DATETIME,
           is_active BOOLEAN DEFAULT 1
@@ -81,6 +82,15 @@ class Database {
                 console.log('✅ Added social_media_handle column to users table');
               }
             });
+            
+            // Add profile_picture column if it doesn't exist
+            this.db.run(`ALTER TABLE users ADD COLUMN profile_picture TEXT`, (alterErr) => {
+              if (alterErr && !alterErr.message.includes('duplicate column name')) {
+                console.error('Error adding profile_picture column:', alterErr);
+              } else if (!alterErr) {
+                console.log('✅ Added profile_picture column to users table');
+              }
+            });
           }
         });
 
@@ -112,11 +122,11 @@ class Database {
       const hashedPassword = bcrypt.hashSync(password, 10);
 
       const sql = `
-        INSERT INTO users (id, email, nickname, password_hash, social_media_handle)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO users (id, email, nickname, password_hash, social_media_handle, profile_picture)
+        VALUES (?, ?, ?, ?, ?, ?)
       `;
 
-      this.db.run(sql, [id, email, nickname, hashedPassword, socialMediaHandle || null], function(err) {
+      this.db.run(sql, [id, email, nickname, hashedPassword, socialMediaHandle || null, null], function(err) {
         if (err) {
           if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'SQLITE_CONSTRAINT') {
             reject(new Error('User already exists'));
@@ -129,6 +139,7 @@ class Database {
             email,
             nickname,
             socialMediaHandle: socialMediaHandle || null,
+            profilePicture: null,
             createdAt: new Date().toISOString()
           });
         }
@@ -167,6 +178,7 @@ class Database {
             email: user.email,
             nickname: user.nickname,
             socialMediaHandle: user.social_media_handle,
+            profilePicture: user.profile_picture,
             createdAt: user.created_at
           });
         } else {
@@ -197,6 +209,20 @@ class Database {
       const sql = 'UPDATE users SET social_media_handle = ? WHERE id = ?';
       
       this.db.run(sql, [socialMediaHandle, userId], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  async updateProfilePicture(userId, profilePicture) {
+    return new Promise((resolve, reject) => {
+      const sql = 'UPDATE users SET profile_picture = ? WHERE id = ?';
+      
+      this.db.run(sql, [profilePicture, userId], function(err) {
         if (err) {
           reject(err);
         } else {
@@ -428,7 +454,7 @@ class Database {
   async getFriends(userId) {
     return new Promise((resolve, reject) => {
       const sql = `
-        SELECT u.id, u.nickname, u.social_media_handle, f.created_at, f.status
+        SELECT u.id, u.nickname, u.social_media_handle, u.profile_picture, f.created_at, f.status
         FROM friends f
         JOIN users u ON f.friend_id = u.id
         WHERE f.user_id = ? AND f.status = 'accepted'
@@ -468,7 +494,7 @@ class Database {
   async getSentFriendRequests(userId) {
     return new Promise((resolve, reject) => {
       const sql = `
-        SELECT u.id, u.nickname, u.social_media_handle, f.created_at, f.status
+        SELECT u.id, u.nickname, u.social_media_handle, u.profile_picture, f.created_at, f.status
         FROM friends f
         JOIN users u ON f.friend_id = u.id
         WHERE f.user_id = ? AND f.status = 'pending'

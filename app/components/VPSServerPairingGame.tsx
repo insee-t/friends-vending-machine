@@ -1542,16 +1542,16 @@ function ActivityScreen({
         {pair ? (
           <div className="flex items-center justify-center space-x-4 mb-6">
             <div className="bg-white bg-opacity-20 rounded-full px-4 py-2">
-              <span className="font-semibold">👤 {pair.user1.nickname}</span>
+              <span className="text-black font-semibold">👤 {pair.user1.nickname}</span>
               {pair.user1.socialMediaHandle && (
-                <span className="text-sm ml-2">📱 {pair.user1.socialMediaHandle}</span>
+                <span className="text-black text-sm ml-2">📱 {pair.user1.socialMediaHandle}</span>
               )}
             </div>
             <div className="text-2xl animate-bounce">🤗</div>
             <div className="bg-white bg-opacity-20 rounded-full px-4 py-2">
-              <span className="font-semibold">👤 {pair.user2.nickname}</span>
+              <span className="text-black font-semibold">👤 {pair.user2.nickname}</span>
               {pair.user2.socialMediaHandle && (
-                <span className="text-sm ml-2">📱 {pair.user2.socialMediaHandle}</span>
+                <span className="text-black text-sm ml-2">📱 {pair.user2.socialMediaHandle}</span>
               )}
             </div>
           </div>
@@ -1559,9 +1559,9 @@ function ActivityScreen({
           <div className="flex items-center justify-center space-x-2 mb-6 flex-wrap">
             {group.members.map((member, index) => (
               <div key={member.id} className="bg-white bg-opacity-20 rounded-full px-4 py-2">
-                <span className="font-semibold">👤 {member.nickname}</span>
+                <span className="text-black font-semibold">👤 {member.nickname}</span>
                 {member.socialMediaHandle && (
-                  <span className="text-sm ml-2">📱 {member.socialMediaHandle}</span>
+                  <span className="text-black text-sm ml-2">📱 {member.socialMediaHandle}</span>
                 )}
               </div>
             ))}

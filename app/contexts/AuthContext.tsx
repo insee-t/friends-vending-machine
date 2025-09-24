@@ -28,7 +28,7 @@ interface FriendRequest {
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
-  signup: (email: string, password: string, nickname: string) => Promise<boolean>
+  signup: (email: string, password: string, nickname: string, socialMediaHandle?: string) => Promise<boolean>
   logout: () => void
   updateSocialMediaHandle: (socialMediaHandle: string) => Promise<boolean>
   sendFriendRequest: (friendId: string) => Promise<boolean>

@@ -95,6 +95,16 @@ if (process.env.APP_ENV === 'production') {
 // In-memory storage for active sessions
 let users = new Map();
 let pairs = new Map();
+let groups = new Map();
+let isWaitingForMoreUsers = false;
+let waitingTimer = null;
+
+// Group matching configuration
+const GROUP_SIZE = 4; // Default group size
+const MIN_GROUP_SIZE = 3; // Minimum group size
+const MAX_GROUP_SIZE = 6; // Maximum group size
+const PAIR_WAIT_TIME = 20000; // Wait 20 seconds before creating pairs
+const GROUP_WAIT_TIME = 10000; // Wait 10 seconds for more users in groups
 
 // JWT secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -277,7 +287,7 @@ io.on('connection', (socket) => {
     io.emit('users-updated', { users: userList });
     
     console.log(`User joined: ${nickname} (${socket.id})`);
-    
+
     // Check for pairing
     checkForPairing();
   });
@@ -324,16 +334,16 @@ io.on('connection', (socket) => {
   // Handle answer submission
   socket.on('submit-answer', (data) => {
     const { pairId, userId, answer, questionIndex } = data;
-    const pair = pairs.get(pairId);
     
     console.log(`Answer submission attempt:`, {
       pairId,
       userId,
       questionIndex,
-      pairExists: !!pair,
       socketId: socket.id
     });
     
+    // Check if it's a pair
+    const pair = pairs.get(pairId);
     if (pair) {
       console.log(`Pair details:`, {
         user1Id: pair.user1.id,
@@ -359,16 +369,48 @@ io.on('connection', (socket) => {
         questionIndex: questionIndex
       });
       console.log(`Answer sent to partner ${partnerSocketId}`);
-    } else {
-      console.log(`Pair ${pairId} not found. Available pairs:`, Array.from(pairs.keys()));
+      return;
     }
+    
+    // Check if it's a group
+    const group = groups.get(pairId);
+    if (group) {
+      console.log(`Group details:`, {
+        groupId: group.id,
+        memberCount: group.members.length,
+        memberNames: group.members.map(m => m.nickname)
+      });
+      
+      // Send the answer to all other group members
+      group.members.forEach(member => {
+        if (member.id !== userId) {
+          console.log(`Sending answer to group member:`, {
+            fromUserId: userId,
+            toMemberSocketId: member.socketId,
+            answer: answer,
+            questionIndex: questionIndex
+          });
+          
+          socket.to(member.socketId).emit('receive-answer', {
+            userId: userId,
+            answer: answer,
+            questionIndex: questionIndex
+          });
+        }
+      });
+      console.log(`Answer sent to all group members`);
+      return;
+    }
+    
+    console.log(`Neither pair nor group ${pairId} found. Available pairs:`, Array.from(pairs.keys()), 'Available groups:', Array.from(groups.keys()));
   });
 
   // Handle activity answer submission
   socket.on('submit-activity-answer', (data) => {
     const { pairId, userId, answer, fileUrl } = data;
-    const pair = pairs.get(pairId);
     
+    // Check if it's a pair
+    const pair = pairs.get(pairId);
     if (pair) {
       console.log(`Activity answer submitted by ${userId} for pair ${pairId}: ${answer}`);
       console.log(`File URL in activity answer:`, fileUrl);
@@ -385,9 +427,33 @@ io.on('connection', (socket) => {
       console.log(`Sending activity answer to partner ${partnerSocketId}:`, dataToSend);
       socket.to(partnerSocketId).emit('receive-activity-answer', dataToSend);
       console.log(`Activity answer sent to partner ${partnerSocketId}`);
-    } else {
-      console.log(`Pair ${pairId} not found`);
+      return;
     }
+    
+    // Check if it's a group
+    const group = groups.get(pairId);
+    if (group) {
+      console.log(`Activity answer submitted by ${userId} for group ${pairId}: ${answer}`);
+      console.log(`File URL in activity answer:`, fileUrl);
+      
+      // Send the answer to all other group members
+      const dataToSend = {
+        userId: userId,
+        answer: answer,
+        fileUrl: fileUrl
+      };
+      
+      group.members.forEach(member => {
+        if (member.id !== userId) {
+          console.log(`Sending activity answer to group member ${member.socketId}:`, dataToSend);
+          socket.to(member.socketId).emit('receive-activity-answer', dataToSend);
+        }
+      });
+      console.log(`Activity answer sent to all group members`);
+      return;
+    }
+    
+    console.log(`Neither pair nor group ${pairId} found for activity answer`);
   });
 });
 
@@ -397,48 +463,131 @@ function getRandomQuestions() {
   return shuffled.slice(0, 6);
 }
 
-// Function to check for pairing
+// Function to check for pairing (supports both pairs and groups)
 function checkForPairing() {
   const waitingUsers = Array.from(users.values()).filter(user => user.status === 'waiting');
   
-  if (waitingUsers.length >= 2) {
-    // Create a pair
-    const shuffled = waitingUsers.sort(() => Math.random() - 0.5);
-    const user1 = shuffled[0];
-    const user2 = shuffled[1];
-    
-    const randomQuestion = iceBreakingQuestions[Math.floor(Math.random() * iceBreakingQuestions.length)];
-    const randomActivity = iceBreakingActivities[Math.floor(Math.random() * iceBreakingActivities.length)];
-    
+  console.log(`Checking for pairing: ${waitingUsers.length} users waiting, isWaiting: ${isWaitingForMoreUsers}`);
+  
+  // Check if we have enough users for a group - cancel any existing timer
+  if (waitingUsers.length >= GROUP_SIZE) {
+    console.log(`Creating group of ${GROUP_SIZE} users immediately`);
+    if (waitingTimer) {
+      clearTimeout(waitingTimer);
+      waitingTimer = null;
+      isWaitingForMoreUsers = false;
+    }
+    createGroup(waitingUsers);
+    return;
+  }
+  
+  // Don't start new waiting if we're already waiting
+  if (isWaitingForMoreUsers) {
+    console.log(`Already waiting for more users, skipping check`);
+    return;
+  }
+  
+  if (waitingUsers.length >= MIN_GROUP_SIZE && waitingUsers.length < GROUP_SIZE) {
+    console.log(`Waiting for more users to form a group of ${GROUP_SIZE}`);
+    isWaitingForMoreUsers = true;
+    // Wait a bit more for a larger group, or create a smaller group if waiting too long
+    waitingTimer = setTimeout(() => {
+      isWaitingForMoreUsers = false;
+      waitingTimer = null;
+      const currentWaitingUsers = Array.from(users.values()).filter(user => user.status === 'waiting');
+      if (currentWaitingUsers.length >= MIN_GROUP_SIZE) {
+        console.log(`Creating group of ${currentWaitingUsers.length} users after waiting`);
+        createGroup(currentWaitingUsers);
+      }
+    }, GROUP_WAIT_TIME);
+  } else if (waitingUsers.length === 2) {
+    console.log(`Only 2 users waiting, will wait ${PAIR_WAIT_TIME/1000} seconds before creating pair`);
+    isWaitingForMoreUsers = true;
+    // Only create pairs if we have exactly 2 users and they've been waiting long enough
+    // This allows groups of 3+ to form naturally
+    waitingTimer = setTimeout(() => {
+      isWaitingForMoreUsers = false;
+      waitingTimer = null;
+      const currentWaitingUsers = Array.from(users.values()).filter(user => user.status === 'waiting');
+      if (currentWaitingUsers.length === 2) {
+        console.log(`Creating pair after waiting period`);
+        createPair(currentWaitingUsers);
+      } else if (currentWaitingUsers.length >= MIN_GROUP_SIZE) {
+        console.log(`More users joined during wait, creating group of ${currentWaitingUsers.length}`);
+        createGroup(currentWaitingUsers);
+      }
+    }, PAIR_WAIT_TIME);
+  }
+}
+
+// Function to create a pair
+function createPair(waitingUsers) {
+  const shuffled = waitingUsers.sort(() => Math.random() - 0.5);
+  const user1 = shuffled[0];
+  const user2 = shuffled[1];
+  
     const pair = {
       id: uuidv4(),
-      user1,
-      user2,
-      question: randomQuestion,
-      activity: randomActivity,
-      questions: getRandomQuestions(), // Add 6 random questions
+    user1,
+    user2,
+    type: 'pair',
+    questions: getRandomQuestions(),
+    createdAt: Date.now()
+  };
+  
+  // Update user statuses
+  user1.status = 'paired';
+  user2.status = 'paired';
+  users.set(user1.id, user1);
+  users.set(user2.id, user2);
+  
+  // Store the pair
+  pairs.set(pair.id, pair);
+
+  // Send pair to both users
+  io.to(user1.socketId).emit('user-paired', { pair });
+  io.to(user2.socketId).emit('user-paired', { pair });
+  
+  // Send updated user list to all clients
+  const userList = Array.from(users.values());
+  io.emit('users-updated', { users: userList });
+  
+  console.log(`Paired users: ${user1.nickname} & ${user2.nickname}`);
+}
+
+// Function to create a group
+function createGroup(waitingUsers) {
+  const shuffled = waitingUsers.sort(() => Math.random() - 0.5);
+  const groupMembers = shuffled.slice(0, Math.min(GROUP_SIZE, waitingUsers.length));
+  
+  const group = {
+    id: uuidv4(),
+    members: groupMembers,
+    type: 'group',
+    questions: getRandomQuestions(),
       createdAt: Date.now()
     };
     
-    // Update user statuses
-    user1.status = 'paired';
-    user2.status = 'paired';
-    users.set(user1.id, user1);
-    users.set(user2.id, user2);
-    
-    // Store the pair
-    pairs.set(pair.id, pair);
-    
-    // Send pair to both users
-    io.to(user1.socketId).emit('user-paired', { pair });
-    io.to(user2.socketId).emit('user-paired', { pair });
-    
-    // Send updated user list to all clients
-    const userList = Array.from(users.values());
-    io.emit('users-updated', { users: userList });
-    
-    console.log(`Paired users: ${user1.nickname} & ${user2.nickname}`);
-  }
+  // Update user statuses
+  groupMembers.forEach(user => {
+    user.status = 'paired';
+    users.set(user.id, user);
+  });
+  
+  // Store the group
+  groups.set(group.id, group);
+
+  // Send group to all members
+  groupMembers.forEach(user => {
+    io.to(user.socketId).emit('user-paired', { group });
+  });
+  
+  // Send updated user list to all clients
+  const userList = Array.from(users.values());
+  io.emit('users-updated', { users: userList });
+  
+  const memberNames = groupMembers.map(u => u.nickname).join(', ');
+  console.log(`Created group with ${groupMembers.length} members: ${memberNames}`);
 }
 
 // Authentication middleware
@@ -535,7 +684,7 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
       fileUrl: fileUrl,
       userAgent: req.headers['user-agent']
     });
-    
+
     res.json({ success: true, fileUrl });
   } catch (error) {
     console.error('File upload error:', error);
@@ -1114,8 +1263,8 @@ const HOST = process.env.HOST || '0.0.0.0';
 async function startServer() {
   try {
     // Try to initialize database, but don't fail if it doesn't work
-    try {
-      await db.init();
+  try {
+    await db.init();
       console.log('✅ Database initialized successfully');
     } catch (dbError) {
       console.warn('⚠️ Database initialization failed, continuing without database:', dbError.message);

@@ -41,6 +41,7 @@ export default function VPSServerPairingGame() {
   const [currentGroup, setCurrentGroup] = useState<Group | null>(null)
   const [gamePhase, setGamePhase] = useState<'nickname' | 'waiting' | 'paired' | 'activity'>('nickname')
   const [waitingMessage, setWaitingMessage] = useState('')
+  const [countdownTimer, setCountdownTimer] = useState(30) // 30 seconds countdown
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
   const [userManuallyLeft, setUserManuallyLeft] = useState(false)
   const socketRef = useRef<Socket | null>(null)
@@ -137,23 +138,21 @@ export default function VPSServerPairingGame() {
     }
   }, [])
 
-  // Update waiting messages
+  // Countdown timer for waiting phase
   useEffect(() => {
     if (gamePhase === 'waiting') {
-      const messages = [
-        "กำลังหาคู่ให้คุณ... 🔍",
-        "มีคนอื่นๆ กำลังเข้ามา... 👥",
-        "อีกสักครู่จะได้เจอเพื่อนใหม่! ⏰",
-        "กำลังเตรียมความสนุกให้คุณ... 🎉"
-      ]
+      setCountdownTimer(30) // Reset countdown when entering waiting phase
       
-      let messageIndex = 0
-      const messageInterval = setInterval(() => {
-        setWaitingMessage(messages[messageIndex])
-        messageIndex = (messageIndex + 1) % messages.length
-      }, 2000)
+      const countdownInterval = setInterval(() => {
+        setCountdownTimer(prev => {
+          if (prev <= 1) {
+            return 30 // Reset to 30 when it reaches 0
+          }
+          return prev - 1
+        })
+      }, 1000)
       
-      return () => clearInterval(messageInterval)
+      return () => clearInterval(countdownInterval)
     }
   }, [gamePhase])
 
@@ -228,7 +227,7 @@ export default function VPSServerPairingGame() {
           <WaitingRoom 
             currentUser={currentUser}
             allUsers={allUsers}
-            waitingMessage={waitingMessage}
+            countdownTimer={countdownTimer}
             onLeave={leaveGame}
             connectionStatus={connectionStatus}
           />
@@ -397,13 +396,13 @@ function NicknameInput({
 function WaitingRoom({ 
   currentUser, 
   allUsers, 
-  waitingMessage, 
+  countdownTimer, 
   onLeave, 
   connectionStatus 
 }: {
   currentUser: User | null
   allUsers: User[]
-  waitingMessage: string
+  countdownTimer: number
   onLeave: () => void
   connectionStatus: string
 }) {
@@ -414,7 +413,13 @@ function WaitingRoom({
       <div className="text-center mb-6">
         <div className="text-6xl mb-4">⏳</div>
         <h2 className="text-2xl font-bold text-black mb-2">กำลังหาคู่ให้คุณ</h2>
-        <p className="text-black opacity-80">{waitingMessage}</p>
+        <div className="flex items-center justify-center space-x-2 mb-2">
+          <span className="text-black opacity-80">การจับคู่ครั้งต่อไปใน:</span>
+        </div>
+        <div className="text-4xl font-bold text-blue-600 mb-2">
+          {countdownTimer}
+        </div>
+        <p className="text-black opacity-60 text-sm">วินาที</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

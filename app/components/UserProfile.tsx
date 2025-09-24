@@ -147,7 +147,7 @@ export const UserProfile: React.FC = () => {
       {/* Profile button */}
       <button
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="flex items-center gap-2 bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-opacity-30 transition-all"
+        className="flex items-center gap-2 bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-opacity-30 transition-all relative"
       >
         {user.profilePicture ? (
           <img 
@@ -171,6 +171,13 @@ export const UserProfile: React.FC = () => {
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
+        
+        {/* Notification badge for pending friend requests */}
+        {friendRequests.length > 0 && (
+          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+            {friendRequests.length}
+          </div>
+        )}
       </button>
 
       {/* Dropdown menu */}
@@ -311,9 +318,17 @@ export const UserProfile: React.FC = () => {
                           {friendRequests.map((request) => (
                             <div key={request.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
                               <div className="flex items-center space-x-2">
-                                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                                  {request.nickname.charAt(0).toUpperCase()}
-                                </div>
+                                {request.profile_picture ? (
+                                  <img 
+                                    src={request.profile_picture} 
+                                    alt={request.nickname}
+                                    className="w-6 h-6 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                                    {request.nickname.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
                                 <div>
                                   <div className="text-xs font-medium text-gray-900">{request.nickname}</div>
                                   {request.social_media_handle && (

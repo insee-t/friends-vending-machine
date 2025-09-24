@@ -474,7 +474,7 @@ class Database {
   async getFriendRequests(userId) {
     return new Promise((resolve, reject) => {
       const sql = `
-        SELECT u.id, u.nickname, u.social_media_handle, f.created_at
+        SELECT u.id, u.nickname, u.social_media_handle, u.profile_picture, f.created_at
         FROM friends f
         JOIN users u ON f.user_id = u.id
         WHERE f.friend_id = ? AND f.status = 'pending'
